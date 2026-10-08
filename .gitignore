@@ -1,0 +1,10 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+packages/analytics/dist/
+packages/analytics/LICENSE
+*.tgz
+*.env
+.env*
+!.env.example
