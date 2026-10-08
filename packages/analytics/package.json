@@ -1,0 +1,23 @@
+{
+  "name": "@rawtree/analytics",
+  "version": "0.1.0",
+  "description": "Generic event and rrweb recording SDK for RawTree Web Analytics",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+    "./recorder": { "types": "./dist/recorder.d.ts", "default": "./dist/recorder.js" },
+    "./server": { "types": "./dist/server.d.ts", "default": "./dist/server.js" },
+    "./protocol": { "types": "./dist/protocol.d.ts", "default": "./dist/protocol.js" }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "peerDependencies": { "rrweb": "^2.1.7" },
+  "peerDependenciesMeta": { "rrweb": { "optional": true } },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "node --test 'test/**/*.test.ts'",
+    "prepack": "npm run build && cp ../../LICENSE LICENSE"
+  }
+}
