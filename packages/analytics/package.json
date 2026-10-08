@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "Generic event and rrweb recording SDK for RawTree Web Analytics",
   "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/rawtreedb/rawtree-web-analytics.git", "directory": "packages/analytics" },
+  "homepage": "https://github.com/rawtreedb/rawtree-web-analytics/tree/main/packages/analytics#readme",
+  "bugs": "https://github.com/rawtreedb/rawtree-web-analytics/issues",
+  "keywords": ["analytics", "web-analytics", "rrweb", "session-replay", "rawtree", "clickhouse"],
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -15,6 +19,7 @@
   "engines": { "node": ">=20" },
   "peerDependencies": { "rrweb": "^2.1.7" },
   "peerDependenciesMeta": { "rrweb": { "optional": true } },
+  "publishConfig": { "access": "public" },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "test": "node --test 'test/**/*.test.ts'",

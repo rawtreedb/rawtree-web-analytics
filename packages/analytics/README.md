@@ -2,7 +2,7 @@
 
 Generic event and session-recording SDK for RawTree Web Analytics. Send product-defined events and rrweb recordings from the browser, plus authoritative events from your backend, to a RawTree Web Analytics collector.
 
-> Status: 0.1.0, not yet published to npm.
+> Status: 0.1.0, early release. The API may change before 1.0.
 
 ## Install
 
@@ -27,7 +27,7 @@ analytics.stop();                 // consent withdrawn
 
 Page URL, referrer, and user agent come from the browser. Override them per event with `sendEvent(name, properties, { pageUrl, referrer, userAgent })`, for example to simulate crawlers or campaign visits in tests. Overrides are sanitized the same way, and `referrer: ""` means none.
 
-Nothing is tracked automatically. Event names and properties are yours. See the [tracking recipes](../../examples/test-console/recipes/RECIPES.md) for page views, CTA clicks, scroll depth, web vitals, signups, and more.
+Nothing is tracked automatically. Event names and properties are yours. See the [tracking recipes](https://github.com/rawtreedb/rawtree-web-analytics/blob/main/examples/test-console/recipes/RECIPES.md) for page views, CTA clicks, scroll depth, web vitals, signups, and more.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
