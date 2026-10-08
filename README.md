@@ -14,11 +14,26 @@ The dashboard and collector are one Next.js app, meant to be deployed. The test 
 
 ## 🧭 How it works
 
+```mermaid
+flowchart LR
+  subgraph app["Your app"]
+    browser["Browser<br/>events + recordings"]
+    backend["Backend<br/>server events"]
+  end
+
+  collector["Collector<br/>/api/collect"]
+  tables[("RawTree<br/>events + recordings")]
+  dashboard["Dashboard + Recordings<br/>/ and /recordings"]
+  agent["Your AI agent<br/>via RawTree MCP"]
+
+  browser -- "@rawtree/analytics" --> collector
+  backend -- "@rawtree/analytics/server" --> collector
+  collector -- "insert-only key" --> tables
+  tables -- "read-only key" --> dashboard
+  tables -- "read-only key" --> agent
 ```
-your app ──@rawtree/analytics──▶ /api/collect ──insert-only key──▶ RawTree: events, recordings
-                                                                        │
-dashboard + replay ◀─────────────────── read-only key ─────────────────┘
-```
+
+The collector and the dashboard are the same Next.js app. The [test console](examples/test-console) plays "Your app" on your machine, sending through the same SDK to a local collector.
 
 - Events and recording chunks are stored as rows. Sessions, recordings, and their completeness are derived in SQL, not kept in a mutable table.
 - Delivery is at least once, so event IDs stay stable across retries and every query deduplicates (`uniqExact(event_id)` or `LIMIT 1 BY`).
@@ -26,40 +41,17 @@ dashboard + replay ◀─────────────────── 
 
 ## 🌳 Set up RawTree
 
-You need a RawTree account and the [`rtree` CLI](https://rawtree.com/docs/reference/cli). Log in once with `rtree login`. The examples use a database called `web_analytics`.
-
-### 1. Create the database and tables
+You need a RawTree account and the [`rtree` CLI](https://rawtree.com/docs/reference/cli). Log in once with `rtree login`, then create a database and two keys: one that can only write, one that can only read.
 
 ```sh
 rtree database create web_analytics
-rtree table create events --database web_analytics --sorting-key "event_name, occurred_at_ms"
-rtree table create recordings --database web_analytics --sorting-key "recording_id, chunk_seq, part_index"
+rtree key create --name web-analytics-ingest --permission write_only --database web_analytics
+rtree key create --name web-analytics-query --permission read_only --database web_analytics
 ```
 
-Create both tables up front. The app writes with a role-bound key, and those inserts never create tables on their own. Columns appear automatically as the first events arrive, so there's no schema to declare.
+That's it. The `events` and `recordings` tables are created on the first ingestion, and their columns appear as events arrive.
 
-### 2. Create two roles: one that only inserts, one that only reads
-
-```sh
-rtree query --database web_analytics "CREATE ROLE web_analytics_ingest"
-rtree query --database web_analytics "GRANT INSERT ON web_analytics.* TO web_analytics_ingest"
-rtree query --database web_analytics "CREATE ROLE web_analytics_query"
-rtree query --database web_analytics "GRANT SELECT ON web_analytics.* TO web_analytics_query"
-```
-
-### 3. Create one API key per role
-
-Role-bound keys are created through the API with an admin API key (or as an organization admin). See [database roles](https://rawtree.com/docs/reference/authentication) in the RawTree docs.
-
-```sh
-curl -X POST "https://api.rawtree.com/v1/keys?database=web_analytics" \
-  -H "Authorization: Bearer $RAWTREE_ADMIN_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"web-analytics-ingest","database_roles":["web_analytics_ingest"]}'
-# Repeat with "web-analytics-query" and ["web_analytics_query"].
-```
-
-Use the admin key only for this setup. The app itself never needs it: the collector gets the insert-only key and the dashboard gets the read-only key.
+These keys apply to every database in your cluster. To limit them to the analytics database, use keys bound to [database roles](https://rawtree.com/docs/reference/authentication) instead. Role-bound inserts don't create tables, so create `events` and `recordings` first in that case.
 
 ## 🚀 Run it locally
 
@@ -68,10 +60,10 @@ You need Node.js 24 or later.
 ```sh
 cp .env.example .env.local   # set RAWTREE_DATABASE, RAWTREE_INGEST_KEY, RAWTREE_QUERY_KEY
 npm install
-PORT=3100 npm run dev        # dashboard + collector on http://localhost:3100
+npm run dev                  # dashboard + collector on http://localhost:3000
 ```
 
-[`.env.example`](.env.example) documents every variable. Locally, keep `ANALYTICS_ALLOWED_ORIGINS=http://localhost:5173` so the test console can send events.
+[`.env.example`](.env.example) documents every variable. Locally, keep `ANALYTICS_ALLOWED_ORIGINS=http://localhost:3001` so the test console can send events.
 
 ## 🧪 Use the test console
 
@@ -79,7 +71,7 @@ The console sends data through the SDK exactly as a real app would, using the pa
 
 ```sh
 npm run console:install                      # from the repo root: pack the SDK and install it in the console
-cd examples/test-console && npm start        # http://localhost:5173, reads ../../.env.local
+cd examples/test-console && npm start        # http://localhost:3001, reads ../../.env.local
 ```
 
 1. **Consent:** turn on Analytics. Nothing is sent before that. Turn on Session recording too if you want a replay.
@@ -144,6 +136,21 @@ GROUP BY plan
 ```
 
 Nothing is tracked automatically: event names and properties are yours. The [SDK README](packages/analytics/README.md) covers options, backend events, and recording privacy. The [tracking recipes](examples/test-console/recipes/RECIPES.md) show page views, CTA clicks, scroll depth, web vitals, signups, and their queries.
+
+## 🤖 Ask your AI agent
+
+Any AI agent or LLM client that speaks MCP can query your analytics through the [RawTree MCP server](https://rawtree.com/docs/reference/mcp). Follow the docs to connect your client of choice, and [use an API key](https://rawtree.com/docs/reference/mcp#hosted-mcp-with-an-api-key) instead of OAuth: give it the **read-only key** from the setup. OAuth grants broad access to your RawTree account, including destructive operations, while the read-only key can only read data.
+
+Give the agent these rules so its numbers match the dashboard:
+
+- Tables: `events` (one row per event) and `recordings` (one row per recording chunk part).
+- Delivery is at least once. Count with `uniqExact(toString(event_id))`, never `count()`. Sessions are `uniqExact(toString(session_id))`, visitors are `uniqExact(toString(anonymous_id))`.
+- Fields are dynamic JSON. Cast them: `toString(event_name)`, `CAST(occurred_at_ms AS Int64)`, `toString(properties.plan)`.
+- Time is `occurred_at_ms` (epoch milliseconds, UTC). Always filter on an explicit window.
+- Page views are `event_name = 'page_view'`, with `page_path`, `page_url`, and `referrer` on the row.
+- Bots are told apart by `user_agent`. The dashboard's pattern is `BOT_UA_PATTERN` in [`lib/dashboard.ts`](lib/dashboard.ts).
+
+The [tracking recipes](examples/test-console/recipes/RECIPES.md) and [`lib/dashboard.ts`](lib/dashboard.ts) have more queries to borrow from.
 
 ## 🔒 Privacy notes
 

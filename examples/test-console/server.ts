@@ -3,7 +3,7 @@
 //   POST /api/server-event  { name, properties, eventId? } -> createServerAnalytics
 //   POST /api/stored        { eventIds, recordingIds } -> stored row counts from RawTree (read-only key)
 //
-// Env: PORT (5173), COLLECTOR_URL (http://localhost:3100/api/collect), ANALYTICS_SERVER_TOKEN,
+// Env: PORT (3001), COLLECTOR_URL (http://localhost:3000/api/collect), ANALYTICS_SERVER_TOKEN,
 //      RAWTREE_API_URL (https://api.rawtree.com), RAWTREE_DATABASE, RAWTREE_QUERY_KEY,
 //      RAWTREE_TABLE_PREFIX, CONSOLE_ENV_FILE (default ../../.env.local; "none" disables it).
 // Variables already set in the environment win over the env file.
@@ -22,8 +22,8 @@ if (envFile !== "none" && existsSync(envFile)) {
 }
 
 const env = process.env;
-const PORT = Number(env.PORT ?? 5173);
-const COLLECTOR_URL = env.COLLECTOR_URL ?? "http://localhost:3100/api/collect";
+const PORT = Number(env.PORT ?? 3001);
+const COLLECTOR_URL = env.COLLECTOR_URL ?? "http://localhost:3000/api/collect";
 const SERVER_TOKEN = env.ANALYTICS_SERVER_TOKEN ?? "";
 const RAWTREE_API_URL = (env.RAWTREE_API_URL ?? "https://api.rawtree.com").replace(/\/$/, "");
 const DATABASE = env.RAWTREE_DATABASE ?? "";

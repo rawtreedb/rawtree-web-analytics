@@ -1,11 +1,11 @@
 # RawTree Web Analytics implementation plan
 
-Status: milestone 1 complete (local implementation, verified end to end against hosted RawTree). Next: milestone 2. Committed locally on `main` (not pushed, published, or deployed). Hosted RawTree database `web_analytics` (org `rawtree`, cluster `internal_projects`) has `events` (sorted by `event_name, occurred_at_ms`) and `recordings` tables holding example test data, with two database-scoped keys and the collector settings in the ignored `.env.local`. See [Milestone 1 results](#-milestone-1-sdk-and-collector-results) and [Milestone 0 storage proof results](#-milestone-0-storage-proof-results).
+Status: milestones 0 to 2 complete, plus the dashboard and recordings follow-up. Milestone 3 (the Eve agent) is deferred by the owner. Next: milestone 4 when the owner asks. Code is on `main` in the private GitHub repo `rawtreedb/rawtree-web-analytics`; nothing is published or deployed. Hosted RawTree database `web_analytics` (org `rawtree`, cluster `internal_projects`) has `events` (sorted by `event_name, occurred_at_ms`) and `recordings` tables holding example test data, with two database-scoped keys and the collector settings in the ignored `.env.local`.
 Last updated: 2026-10-08.
 
 Repository name: **`rawtree-web-analytics`**. Proposed npm package: **`@rawtree/analytics`**, subject to namespace ownership and availability. The eventual remote repository URL is not yet established.
 
-> Open-source analytics for websites and web apps, with session replay and an AI agent. Powered by RawTree, rrweb, and Eve.
+> Open-source analytics for websites and web apps, with session replay. Powered by RawTree and rrweb.
 
 ## 🧭 Continue this plan in another session
 
@@ -18,7 +18,7 @@ Repository name: **`rawtree-web-analytics`**. Proposed npm package: **`@rawtree/
 
 Suggested continuation prompt:
 
-> Read IMPLEMENTATION.md and applicable AGENTS.md files. Inspect the current state and continue the first unfinished milestone. Keep the SDK generic, authentication optional, and the Eve agent small. Implement and verify the local work, update the plan and session ledger, and ask before actions affecting shared resources or publication.
+> Read IMPLEMENTATION.md and applicable AGENTS.md files. Inspect the current state and continue the first unfinished milestone. Keep the SDK generic and authentication optional. The Eve agent is deferred: don't build it unless the owner asks. Implement and verify the local work, update the plan and session ledger, and ask before actions affecting shared resources or publication.
 
 This is a fresh project, not a migration of Treewatcher. Do not copy its private Git history, internal data, credentials, company-specific policies, or knowledge systems.
 
@@ -200,6 +200,8 @@ Derive the initial recordings list from chunk metadata instead of maintaining an
 
 ## 🤖 Minimal Eve agent
 
+> **Deferred (2026-10-08, owner decision).** Not building this for now. Reasons: a public dashboard without login would expose a chat endpoint that spends the deployer's AI budget; Eve is in preview and changes fast (seven releases in ten days); and people can already use their own agent through the RawTree MCP with the read-only key. A possible lighter replacement, not yet approved: a README section on connecting the RawTree MCP with the read-only key, plus one markdown analytics skill that teaches this schema's query rules. The design below is kept for reference.
+
 Use one agent with a short instructions file, current-time context, two authored tools, and two small static skills. Skills are versioned instructions, not a persisted catalog.
 
 | Tool | Responsibility |
@@ -300,6 +302,8 @@ Acceptance: send a known set of events and one recording from the test console. 
 Not in this milestone: synthetic demo mode, auth or access-denial checks, event-to-replay timestamp links, and mobile polish. The open-deployment warning moves to release.
 
 ### 3. Add the minimal Eve agent
+
+**Deferred** by the owner on 2026-10-08. See the note in [Minimal Eve agent](#-minimal-eve-agent).
 
 - [ ] Implement the two tools and two skills with restricted runtime capabilities.
 - [ ] Wire explicit live-agent activation, model configuration, resource limits, and tool provenance.
@@ -680,3 +684,5 @@ These references were inspected during planning. Recheck current contracts befor
 | 2026-10-08 | Recordings redesign at the owner's request: `/recordings` opens the newest recording; `/recordings/[id]` shows the player on the left and a sidebar of the 50 most recent recordings (start, duration, session, size, status). Player: fixed resume after pause (rrweb `play()` without an offset restarts from 0; now resumes from `getCurrentTime()`), replay scaled to fit the stage, seek timeline with elapsed/total time, icon play/pause and restart, `PlaybackSpeed` pill control instead of a native select, segment pills for incomplete recordings. Checked in Chrome (playwright) at 1440 and 390 px: redirect, resume position kept (0:03 → 0:03), replay fits the stage, no horizontal overflow, sidebar navigation, speed state. Tests SDK 43/43, root 40/40, build OK. | Local only; nothing committed. | Milestone 3. |
 | 2026-10-08 | Recordings view fills the viewport from `lg` (1024 px) up: list on the right from `lg`, only the list scrolls, the replay stage stretches to the remaining height. Below `lg` the list stacks under the player with normal page scroll. Checked at 1440×900 and 1024×768 (no page scroll, list scrolls) and 390×844. | Local only; nothing committed. | Milestone 3. |
 | 2026-10-08 | Created the private GitHub repo `rawtreedb/rawtree-web-analytics` and pushed `main` (4 new commits). Wrote the root README: RawTree setup with `rtree` and role-bound keys, running locally, using the test console and dashboard, deploying the dashboard and what it exposes, adding the SDK. Prepared the SDK for npm (repository, homepage, keywords, public access; `npm publish --dry-run` OK). Owner set the release targets in milestone 4: public dashboard, local-only console, SDK on npm. | GitHub: private repo with `main` pushed. README and SDK metadata uncommitted. Nothing published or deployed. | Milestone 3. Publish and deploy only when the owner asks. |
+| 2026-10-08 | Started milestone 3: read the plan and Treewatcher's Eve 0.68 setup, checked Eve releases (0.74.0 latest, seven releases since 2026-09-28). The owner questioned whether the agent is needed; recommended the RawTree MCP plus an analytics skill instead. Owner decision: defer the Eve agent. Updated the status, tagline, continuation prompt, milestone 3, and AGENTS.md scope. | Local docs only; nothing committed. No Eve dependency added. | Owner to decide on the MCP guide and analytics skill, or move to milestone 4 when ready. |
+| 2026-10-08 | README: "Ask your AI agent" section (any MCP client, read-only key; verified the role-bound read-only key works through the hosted RawTree MCP), RawTree setup simplified to a database and two `rtree key create` keys (tables created on first ingestion, per RawTree docs; not yet verified on a fresh database), Mermaid architecture diagram (rendered and checked). Local ports moved to 3000 (dashboard + collector) and 3001 (test console); console typecheck and smoke 38/38. | Committed and pushed. Nothing published or deployed. | Fresh-setup check on a disposable database (needs owner approval). Decide recording access for a public deploy. Recreate the real tables before real users. |

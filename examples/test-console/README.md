@@ -14,18 +14,18 @@ After changing the SDK, run `npm run console:install` again. A plain `npm instal
 ## Run
 
 ```sh
-npm run dev          # in the repository root, collector on port 3100: PORT=3100 npm run dev
-npm start            # here: vite build + node server.ts -> http://localhost:5173
+npm run dev          # in the repository root: collector on http://localhost:3000
+npm start            # here: vite build + node server.ts -> http://localhost:3001
 ```
 
-The collector must list `http://localhost:5173` in `ANALYTICS_ALLOWED_ORIGINS`. Server events need the same `ANALYTICS_SERVER_TOKEN` on both sides. The Stored column needs `RAWTREE_DATABASE` and the read-only `RAWTREE_QUERY_KEY`.
+The collector must list `http://localhost:3001` in `ANALYTICS_ALLOWED_ORIGINS`. Server events need the same `ANALYTICS_SERVER_TOKEN` on both sides. The Stored column needs `RAWTREE_DATABASE` and the read-only `RAWTREE_QUERY_KEY`.
 
 ## Environment (console server)
 
 | Variable | Default |
 | --- | --- |
-| `PORT` | `5173` |
-| `COLLECTOR_URL` | `http://localhost:3100/api/collect` |
+| `PORT` | `3001` |
+| `COLLECTOR_URL` | `http://localhost:3000/api/collect` |
 | `ANALYTICS_SERVER_TOKEN` | unset: server events disabled |
 | `RAWTREE_API_URL` | `https://api.rawtree.com` |
 | `RAWTREE_DATABASE`, `RAWTREE_QUERY_KEY` | unset: "storage check not configured" |
@@ -43,4 +43,4 @@ npm run size         # eager vs lazy JS sizes; fails if rrweb is in the eager bu
 npm run smoke        # mock collector + console server + headless system Chrome
 ```
 
-The smoke test uses `playwright-core` from the repository root and never contacts RawTree. `SMOKE_SCREENSHOT=path.png` saves a screenshot. `SMOKE_FORWARD_TO=http://localhost:3100/api/collect` also forwards every valid request to a real collector (run with `SMOKE_APP_PORT=5173` and `SMOKE_SERVER_TOKEN=<collector token>`). Forwarded data is written to whatever tables that collector uses.
+The smoke test uses `playwright-core` from the repository root and never contacts RawTree. `SMOKE_SCREENSHOT=path.png` saves a screenshot. `SMOKE_FORWARD_TO=http://localhost:3000/api/collect` also forwards every valid request to a real collector (run with `SMOKE_APP_PORT=3001` and `SMOKE_SERVER_TOKEN=<collector token>`). Forwarded data is written to whatever tables that collector uses.

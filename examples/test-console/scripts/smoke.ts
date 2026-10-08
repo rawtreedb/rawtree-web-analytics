@@ -10,7 +10,7 @@
 //      SMOKE_SCREENSHOT (optional PNG path, taken before analytics is turned off),
 //      SMOKE_FORWARD_TO (optional real collector URL: every valid request is also forwarded there
 //      with its Origin/Authorization headers and must be accepted. The real collector must allow
-//      the console origin, e.g. SMOKE_APP_PORT=5173, and SMOKE_SERVER_TOKEN must equal its
+//      the console origin, e.g. SMOKE_APP_PORT=3001, and SMOKE_SERVER_TOKEN must equal its
 //      ANALYTICS_SERVER_TOKEN. The injected failure is answered locally and not forwarded.)
 
 import { type ChildProcess, spawn } from "node:child_process";
