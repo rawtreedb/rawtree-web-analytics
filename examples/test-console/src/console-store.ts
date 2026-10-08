@@ -62,6 +62,8 @@ export type ConsoleState = {
   entries: Entry[]; // newest first
   /** Bytes of rrweb payload accepted by the collector, for the playground privacy checks. */
   recordingBytesSent: number;
+  /** Mask all page text in recordings (the SDK default). Off: text is readable, inputs stay masked. */
+  maskText: boolean;
 };
 
 const CONSENT_KEY = "rawtree_test_console:consent";
@@ -78,7 +80,7 @@ function loadConsent(): Consent {
   }
 }
 
-let state: ConsoleState = { consent: loadConsent(), recording: "off", entries: [], recordingBytesSent: 0 };
+let state: ConsoleState = { consent: loadConsent(), recording: "off", entries: [], recordingBytesSent: 0, maskText: false };
 
 // rrweb payloads the collector accepted, kept so the playground can prove what never left the page.
 const sentRecordingPayloads: string[] = [];
@@ -233,7 +235,13 @@ async function applyConsent(): Promise<void> {
     try {
       const { startRecording } = await import("@rawtree/analytics/recorder");
       // Consent may have changed while the chunk loaded.
-      if (client && state.consent.analytics && state.consent.recording && !stopRecorder) stopRecorder = startRecording(client);
+      // Readable text (inputs stay masked) and dense mouse sampling so the replay cursor glides.
+      if (client && state.consent.analytics && state.consent.recording && !stopRecorder) {
+        stopRecorder = startRecording(client, {
+          maskAllText: state.maskText,
+          sampling: { mousemove: 30, mousemoveCallback: 200 },
+        });
+      }
     } catch (error) {
       console.error("could not load the recorder", error);
     }
@@ -249,6 +257,14 @@ export function setConsent(next: Consent): void {
     // Storage blocked: the choice lasts for this page only.
   }
   setState({ consent });
+  void applyConsent();
+}
+
+/** Restart the recorder with or without text masking. rrweb takes a new full snapshot on start. */
+export function setMaskText(maskText: boolean): void {
+  setState({ maskText });
+  stopRecorder?.();
+  stopRecorder = undefined;
   void applyConsent();
 }
 
@@ -281,6 +297,31 @@ export function sendBrowserEvent(name: string, properties: Properties): string |
   if (id) {
     addEntry({ kind: "event", key: nextKey(), at: Date.now(), id, name, source: "browser", delivery: { state: "queued" }, storage: { state: "waiting" }, sends: 1, payload: { name, properties } });
   }
+  return id;
+}
+
+/**
+ * Send one event as a new simulated visitor: its own in-memory anonymous and session IDs,
+ * an optional user agent, and optionally another page URL and referrer.
+ */
+export async function sendAsVisitor(
+  name: string,
+  properties: Properties,
+  options: { userAgent?: string; url?: string; referrer?: string } = {},
+): Promise<string | undefined> {
+  const { config, consent } = state;
+  if (!config || !consent.analytics) return undefined;
+  const visitor = createAnalytics({ endpoint: config.collectorUrl, fetch: instrumentedFetch, onError: onSdkError, persistence: "memory" });
+  const id = visitor.sendEvent(name, properties, {
+    userAgent: options.userAgent,
+    pageUrl: options.url && new URL(options.url, location.href).href,
+    referrer: options.referrer,
+  });
+  if (id) {
+    addEntry({ kind: "event", key: nextKey(), at: Date.now(), id, name, source: "browser", delivery: { state: "queued" }, storage: { state: "waiting" }, sends: 1, payload: { name, properties, ...options } });
+  }
+  await visitor.flush();
+  visitor.stop();
   return id;
 }
 

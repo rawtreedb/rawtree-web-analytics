@@ -6,11 +6,13 @@ import {
   IconCheck,
   IconCloudUpload,
   IconPlayerRecord,
+  IconRobot,
   IconRefresh,
   IconRepeat,
   IconSend,
   IconServer,
   IconShieldCheck,
+  IconTargetArrow,
   IconX,
 } from "@tabler/icons-react";
 import { Fragment, type ReactNode, useState } from "react";
@@ -27,8 +29,10 @@ import {
   flush,
   resetIdentity,
   sendBrowserEvent,
+  sendAsVisitor,
   sendServerEvent,
   setConsent,
+  setMaskText,
   type Storage,
   useConsole,
 } from "./console-store.ts";
@@ -59,6 +63,29 @@ const BROWSER_EVENTS: { name: string; props: () => Properties }[] = [
   { name: "project_created", props: () => ({ project_id: `prj_${shortId()}`, template: "blank" }) },
   { name: "feature_used", props: () => ({ feature: "search" }) },
 ];
+
+/** One preset per crawler category in lib/crawlers.ts (dashboard Bots section). */
+const BOTS: { label: string; userAgent: string }[] = [
+  { label: "GPTBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko); compatible; GPTBot/1.2; +https://openai.com/gptbot" },
+  { label: "ClaudeBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)" },
+  { label: "PerplexityBot", userAgent: "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)" },
+  { label: "Googlebot", userAgent: "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+  { label: "Bingbot", userAgent: "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)" },
+  { label: "facebookexternalhit", userAgent: "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)" },
+  { label: "AhrefsBot", userAgent: "Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)" },
+  { label: "curl", userAgent: "curl/8.7.1" },
+  { label: "HeadlessChrome", userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.0.0 Safari/537.36" },
+  { label: "ExampleBot", userAgent: "ExampleBot/1.0 (+https://example.com/bot)" },
+];
+
+/** Campaign visits; utm_* survive the SDK URL sanitizer (allowedQueryParams default). */
+const VISITS: { label: string; referrer: string; query: string }[] = [
+  { label: "Google ad", referrer: "https://www.google.com/", query: "utm_source=google&utm_medium=cpc&utm_campaign=launch" },
+  { label: "Newsletter", referrer: "", query: "utm_source=newsletter&utm_medium=email&utm_campaign=october" },
+  { label: "Hacker News", referrer: "https://news.ycombinator.com/", query: "" },
+];
+
+const visitorPageView = (path: string) => ({ page_view_id: crypto.randomUUID(), path, navigation: "initial" });
 
 const SERVER_EVENTS: { name: string; props: Properties }[] = [
   { name: "signup_completed", props: { plan: "pro", method: "password" } },
@@ -110,6 +137,7 @@ export function App() {
         <aside className="flex min-h-0 flex-col gap-5 lg:-mr-2 lg:overflow-y-auto lg:pr-2 lg:pb-1 [&>*]:shrink-0">
           <BrowserEventsCard />
           <ServerEventsCard />
+          <TrafficCard />
           <PlaygroundCard />
         </aside>
         <EventViewer />
@@ -275,6 +303,64 @@ function ServerEventsCard() {
   );
 }
 
+function TrafficCard() {
+  const { consent } = useConsole();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <IconRobot className="size-4 text-primary" /> Simulated traffic
+          <InfoTooltip>Each click is a new visitor (own anonymous_id and session_id) sending one page_view. Your own IDs are untouched.</InfoTooltip>
+        </CardTitle>
+        <CardDescription>{consent.analytics ? "Crawler visits and campaign visits for the dashboard." : "Turn on analytics consent to send events."}</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bots (user agent override)</span>
+          <div className="flex flex-wrap gap-2">
+            {BOTS.map((bot) => (
+              <Button
+                key={bot.label}
+                variant="secondary"
+                size="sm"
+                disabled={!consent.analytics}
+                data-bot={bot.label}
+                title={bot.userAgent}
+                onClick={() => void sendAsVisitor("page_view", visitorPageView(location.pathname), { userAgent: bot.userAgent, referrer: "" })}
+              >
+                {bot.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 border-t pt-4">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            <IconTargetArrow className="size-3.5" /> Acquisition (referrer + UTM)
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {VISITS.map((visit) => (
+              <Button
+                key={visit.label}
+                variant="secondary"
+                size="sm"
+                disabled={!consent.analytics}
+                data-visit={visit.label}
+                title={`referrer ${visit.referrer || "(none)"} · ?${visit.query}`}
+                onClick={() => {
+                  const url = `/pricing${visit.query ? `?${visit.query}` : ""}`;
+                  void sendAsVisitor("page_view", visitorPageView("/pricing"), { url, referrer: visit.referrer });
+                }}
+              >
+                {visit.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const SECRETS = {
   blocked: "sk_test_SENTINEL_123",
   token: "SENTINEL_URL",
@@ -283,7 +369,7 @@ const SECRETS = {
 };
 
 function PlaygroundCard() {
-  const { recording, recordingBytesSent } = useConsole();
+  const { recording, recordingBytesSent, maskText } = useConsole();
   const [items, setItems] = useState<string[]>(["First item"]);
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -294,8 +380,9 @@ function PlaygroundCard() {
     { label: "API key inside the rr-block region", leaked: found[SECRETS.blocked] },
     { label: "Token in the link URL", leaked: found[SECRETS.token] },
     { label: "Email in the data-email attribute", leaked: found[SECRETS.email] || found[encodeURIComponent(SECRETS.email)] },
-    { label: "Panel text", leaked: open || recordingBytesSent > 0 ? found[SECRETS.panel] : undefined },
   ];
+  // Page text is readable unless "Mask all text" is on, so the panel text is only a privacy check then.
+  const panelSeen = open || recordingBytesSent > 0 ? found[SECRETS.panel] : undefined;
   return (
     <Card>
       <CardHeader>
@@ -309,6 +396,12 @@ function PlaygroundCard() {
         <CardDescription>
           {recording === "off" ? "Turn on session recording in the consent row first." : "Change the page and check what stays private."}
         </CardDescription>
+        <CardAction>
+          <label className="flex items-center gap-2 text-xs">
+            <Switch id="mask-text" checked={maskText} onCheckedChange={setMaskText} />
+            Mask all text
+          </label>
+        </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <Step3 title="1. Make the page change" tip="Each click adds or removes elements, which the recorder captures. New recording parts then appear in the event viewer.">
@@ -347,13 +440,13 @@ function PlaygroundCard() {
               API key <span>{SECRETS.blocked}</span>
             </div>
           </Example>
-          <Example label="Link with a token" tip="Link addresses lose their ?query and #hash before they are recorded, because these often carry tokens.">
-            <a href={`/?token=${SECRETS.token}`} className="text-xs text-primary underline-offset-4 hover:underline" onClick={(event) => event.preventDefault()}>
+          <Example label="Link with a token" tip="Link addresses lose their ?query and #hash before they are recorded, because these often carry tokens. The link text has the rr-mask class, which masks it even when page text is readable.">
+            <a href={`/?token=${SECRETS.token}`} className="rr-mask text-xs text-primary underline-offset-4 hover:underline" onClick={(event) => event.preventDefault()}>
               /?token={SECRETS.token}
             </a>
           </Example>
-          <Example label="Email in an attribute" tip="rrweb does not mask attributes by itself, so the SDK masks any attribute value that contains an email address.">
-            <span data-email={SECRETS.email} className="font-mono text-xs text-muted-foreground">
+          <Example label="Email in an attribute" tip="rrweb does not mask attributes by itself, so the SDK masks any attribute value that contains an email address. The visible text uses rr-mask.">
+            <span data-email={SECRETS.email} className="rr-mask font-mono text-xs text-muted-foreground">
               {"<span data-email=\"jane.doe@example.com\">"}
             </span>
           </Example>
@@ -361,7 +454,7 @@ function PlaygroundCard() {
 
         <Step3
           title="3. Privacy check"
-          tip="Searches the recording data the collector accepted for each private value. Page text is masked by default too, so the panel text should never appear."
+          tip="Searches the recording data the collector accepted for each private value. Page text is readable by default; turn on Mask all text and the panel text disappears too."
           extra={<Badge variant="outline">{(recordingBytesSent / 1024).toFixed(1)} KB checked</Badge>}
         >
           <ul className="flex flex-col gap-1.5" data-testid="privacy-checks">
@@ -381,6 +474,16 @@ function PlaygroundCard() {
                 )}
               </li>
             ))}
+            <li className="flex items-center justify-between gap-3 text-xs">
+              <span>Panel text {maskText ? "(masked)" : "(readable)"}</span>
+              {recordingBytesSent === 0 || panelSeen === undefined ? (
+                <Badge variant="secondary">{recordingBytesSent === 0 ? "no recording data yet" : "open the panel first"}</Badge>
+              ) : panelSeen ? (
+                <Badge variant={maskText ? "error" : "info"}>found in recording</Badge>
+              ) : (
+                <Badge variant={maskText ? "success" : "secondary"}>not in recording</Badge>
+              )}
+            </li>
           </ul>
         </Step3>
       </CardContent>

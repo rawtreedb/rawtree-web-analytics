@@ -18,5 +18,8 @@ const chunkMeta = (): Plugin => ({
 
 export default defineConfig({
   plugins: [tailwindcss(), chunkMeta()],
+  // Tailwind runs through the @tailwindcss/vite plugin; pin an empty PostCSS config so
+  // Vite does not pick up the Next.js app's root postcss.config.mjs.
+  css: { postcss: { plugins: [] } },
   build: { sourcemap: false },
 });

@@ -163,6 +163,22 @@ try {
   check("web_vital has metric_name, metric_id, value, delta, rating", ["metric_name", "metric_id", "value", "delta", "rating"].every((k) => k in props("web_vital")), props("web_vital"));
   check("browser events carry the shown anonymous_id", browserEvents.every((e) => e.anonymous_id === anonymousId && e.source === "browser"));
 
+  // 2b. Simulated traffic: bots and campaign visits are new visitors with their own IDs.
+  const visitorsBefore = received.length;
+  await page.click('[data-bot="GPTBot"]');
+  await page.click('[data-visit="Google ad"]');
+  await page.waitForFunction(() => document.querySelectorAll('tr[data-name="page_view"] [data-col="sent"][data-state="sent"]').length >= 3);
+  const visitors = received.slice(visitorsBefore).filter((r) => r.status === 200).flatMap((r) => r.events);
+  const bot = visitors.find((e) => e.user_agent?.includes("GPTBot"));
+  const campaign = visitors.find((e) => e.referrer === "https://www.google.com/");
+  check("bot page_view carries the preset user agent and its own anonymous_id", !!bot && bot.anonymous_id !== anonymousId && !bot.referrer, bot);
+  check(
+    "campaign page_view keeps utm_* in page_url and the google referrer",
+    !!campaign && campaign.anonymous_id !== anonymousId && campaign.anonymous_id !== bot?.anonymous_id && /\/pricing\?utm_source=google&utm_medium=cpc&utm_campaign=launch$/.test(campaign.page_url ?? ""),
+    campaign,
+  );
+  check("simulated visitors leave the console identity and URL untouched", (await page.textContent('[data-testid="anonymous-id"]')) === anonymousId && new URL(page.url()).pathname === "/" && !(await page.evaluate(() => Object.hasOwn(document, "referrer"))));
+
   // 3. Injected collector failure: the row shows the status code, then recovers on retry.
   failNext = 1;
   await page.click('[data-action="feature_used"]');
@@ -253,6 +269,7 @@ try {
   check("recording row storage shows 'not configured'", (await stateOf(page, recordingId, "stored")) === "unconfigured");
   const leaked = SENTINELS.filter((s) => received.some((r) => r.raw.includes(s)));
   check("masked/blocked sentinels never appear in any payload", leaked.length === 0, leaked);
+  check("page text is readable in the recording by default", received.some((r) => r.raw.includes("A panel that opens and closes.")));
 
   if (process.env.SMOKE_SCREENSHOT) {
     await page.locator(`tr[data-id="${ids.cta_click}"]`).click();

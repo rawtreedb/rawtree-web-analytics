@@ -6,7 +6,7 @@ Start the browser recipes only after analytics consent. Each one is a function `
 
 ## Shared rules
 
-**Stored rows.** The collector stores each event as one row in the RawTree `events` table with these fields: `v, event_id, event_name, occurred_at_ms, client_sent_at_ms, received_at_ms, source ("browser" | "server"), sdk, session_id, anonymous_id, user_id, page_url, page_path, referrer, properties{...}`. Timestamps are epoch milliseconds. `page_url` keeps only allowlisted query parameters (utm_* by default) and no hash. `page_path` is derived from `page_url`.
+**Stored rows.** The collector stores each event as one row in the RawTree `events` table with these fields: `v, event_id, event_name, occurred_at_ms, client_sent_at_ms, received_at_ms, source ("browser" | "server"), sdk, session_id, anonymous_id, user_id, page_url, page_path, referrer, user_agent, properties{...}`. Timestamps are epoch milliseconds. `page_url` keeps only allowlisted query parameters (utm_* by default) and no hash. `page_path` is derived from `page_url`.
 
 **Page views.** Page views, exits, scroll depth, and time on page share one page-view state ([`navigation.ts`](navigation.ts)). Their events carry `properties.page_view_id` and `properties.path` (the page the measurement belongs to). Use `properties.path`, not `page_path`, for time on page: it is sent while navigating away, so `page_url` already shows the next page.
 
@@ -28,6 +28,8 @@ Start the browser recipes only after analytics consent. Each one is a function `
 | 8 | [Logins](#8-logins) | `login_succeeded` | server | [logins.ts](logins.ts) |
 | 9 | [Product events](#9-product-events) | `project_created`, `feature_used` | browser | [product-events.ts](product-events.ts) |
 | 10 | [Backend events](#10-backend-events) | `export_completed` | server | [backend-events.ts](backend-events.ts) |
+
+Two notes on `page_view` data follow the recipes: [bots](#bots) and [acquisition](#acquisition). Their queries are not covered by the verification above yet.
 
 ## 1. Page views
 
@@ -520,4 +522,48 @@ WHERE toString(source) = 'server'
   AND CAST(occurred_at_ms AS Int64) >= toUnixTimestamp64Milli(now64() - INTERVAL 7 DAY)
 GROUP BY event
 ORDER BY outcomes DESC
+```
+
+## Bots
+
+**Data.** Every browser event carries `user_agent` (the browser's `navigator.userAgent`). Server events take it from `context.userAgent`, and otherwise the collector uses the request's `User-Agent` header. Crawlers that run JavaScript (headless browsers, some AI fetchers) send page views like any visitor. The dashboard classifies them with `lib/crawlers.ts` (AI retrieval, AI training, search indexer, social preview, SEO tool, script or headless).
+
+**Test console.** The *Simulated traffic* card sends one `page_view` per crawler preset with `sendEvent("page_view", properties, { userAgent })`. Each click is a new visitor: a throwaway `createAnalytics({ persistence: "memory" })` client, so bots get their own `anonymous_id` and `session_id` and never touch yours.
+
+```sql
+-- Page views by user agent, last 7 days (classify the result with lib/crawlers.ts)
+SELECT
+  toString(user_agent) AS ua,
+  uniqExact(toString(event_id)) AS page_views
+FROM events
+WHERE toString(event_name) = 'page_view'
+  AND CAST(occurred_at_ms AS Int64) >= toUnixTimestamp64Milli(now64() - INTERVAL 7 DAY)
+GROUP BY ua
+ORDER BY page_views DESC
+LIMIT 50
+```
+
+## Acquisition
+
+**Data.** `referrer` is `document.referrer` and `page_url` keeps the `utm_*` parameters (the SDK's default `allowedQueryParams`; anything else is stripped). Attribute a visitor to the referrer and UTM values of their first page view.
+
+**Test console.** The *Acquisition* buttons send a `page_view` as a new visitor on `/pricing?utm_source=...&utm_medium=...&utm_campaign=...` with a referrer (Google, none for the newsletter, Hacker News). The SDK reads both from the page, so the console swaps the URL (`history.replaceState`) and `document.referrer` only for the synchronous `sendEvent` call.
+
+```sql
+-- First-touch source per visitor, last 7 days
+SELECT
+  if(source = '', if(ref_host = '', '(direct)', ref_host), source) AS acquisition,
+  count() AS visitors
+FROM (
+  SELECT
+    toString(anonymous_id) AS visitor,
+    argMin(extractURLParameter(toString(page_url), 'utm_source'), CAST(occurred_at_ms AS Int64)) AS source,
+    argMin(domain(toString(referrer)), CAST(occurred_at_ms AS Int64)) AS ref_host
+  FROM events
+  WHERE toString(event_name) = 'page_view'
+    AND CAST(occurred_at_ms AS Int64) >= toUnixTimestamp64Milli(now64() - INTERVAL 7 DAY)
+  GROUP BY visitor
+)
+GROUP BY acquisition
+ORDER BY visitors DESC
 ```
