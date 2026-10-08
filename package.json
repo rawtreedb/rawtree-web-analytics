@@ -16,19 +16,29 @@
     "console:install": "npm run sdk:pack && cd examples/test-console && npm install ./vendor/rawtree-analytics-0.1.0.tgz"
   },
   "devDependencies": {
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "24.19.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "playwright-core": "1.63.0",
     "rrweb": "2.1.7",
+    "tailwindcss": "^4.3.3",
     "typescript": "7.0.2"
   },
   "workspaces": [
     "packages/*"
   ],
   "dependencies": {
+    "@base-ui/react": "1.2.0",
+    "@tabler/icons-react": "3.46.0",
+    "class-variance-authority": "0.7.1",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-day-picker": "10.0.2",
+    "react-dom": "19.3.0",
+    "recharts": "3.10.1",
+    "tailwind-merge": "3.5.0"
   }
 }
