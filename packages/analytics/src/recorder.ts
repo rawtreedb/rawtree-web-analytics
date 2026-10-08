@@ -1,8 +1,8 @@
 // Optional rrweb integration. Import from "@rawtree/analytics/recorder" so event-only
 // installs never bundle rrweb. Start it only after the application allows recording.
 //
-// Privacy defaults: mask all inputs and all text, block elements with class "rr-block",
-// no canvas, fonts, or inlined images. rrweb masks text and inputs but not attributes or
+// Privacy defaults: mask all inputs and all text (maskAllText: false keeps text readable),
+// block elements with class "rr-block", no canvas, fonts, or inlined images. rrweb masks text and inputs but not attributes or
 // URLs, so every emitted event is also sanitized before it is queued:
 // - the page URL in Meta events keeps only allowlisted query parameters;
 // - URL attributes (href, src, action, ...) lose their query string and hash;
@@ -21,6 +21,8 @@ export type StartRecordingOptions = Omit<RecordOptions, "emit"> & {
   allowedQueryParams?: readonly string[];
   /** Attributes whose values are masked. Default: title, alt, aria-label, aria-description, placeholder. */
   maskAttributes?: readonly string[];
+  /** Mask every text node (default true). Set false for readable replays; inputs stay masked by maskAllInputs. */
+  maskAllText?: boolean;
 };
 
 export const RECORDING_DEFAULTS = {
@@ -84,12 +86,14 @@ export function sanitizeRecordingEvent(
  * when the client starts a new recording (after reset()).
  */
 export function startRecording(analytics: Analytics, options: StartRecordingOptions = {}): () => void {
-  const { allowedQueryParams, maskAttributes, ...recordOptions } = options;
+  const { allowedQueryParams, maskAttributes, maskAllText = true, ...recordOptions } = options;
+  const { maskTextSelector, ...defaults } = RECORDING_DEFAULTS;
   let recordingId = analytics.recordingId;
   let awaitingSnapshot = false;
   let stopped = false;
   const stop = record({
-    ...RECORDING_DEFAULTS,
+    ...defaults,
+    ...(maskAllText ? { maskTextSelector } : {}),
     ...recordOptions,
     emit(event) {
       // rrweb can still emit throttled events after stop(); ignore them.

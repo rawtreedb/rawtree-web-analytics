@@ -75,6 +75,22 @@ describe("createAnalytics", () => {
     analytics.stop();
   });
 
+  it("applies per-event page URL, referrer, and user agent overrides through the same sanitizer", async () => {
+    const { calls, fetch } = collector();
+    const { analytics } = client(fetch);
+    analytics.sendEvent("page_view", {}, {
+      pageUrl: "https://shop.example/landing?utm_campaign=launch&token=secret",
+      referrer: "",
+      userAgent: "GPTBot/1.2",
+    });
+    await analytics.flush();
+    const [view] = calls[0].body.events ?? [];
+    assert.equal(view.page_url, "https://shop.example/landing?utm_campaign=launch");
+    assert.equal(view.referrer, undefined);
+    assert.equal(view.user_agent, "GPTBot/1.2");
+    analytics.stop();
+  });
+
   it("retries retryable failures with the same event IDs and stops after success", async () => {
     const { calls, fetch } = collector([503, 503]);
     const { analytics } = client(fetch);

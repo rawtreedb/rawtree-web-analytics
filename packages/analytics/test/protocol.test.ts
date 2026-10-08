@@ -52,6 +52,9 @@ describe("parseCollectRequest", () => {
     ["future timestamp", { events: [event({ occurred_at: NOW + 2 * 86_400_000 })] }, /occurred_at/],
     ["fractional timestamp", { events: [event({ occurred_at: NOW - 0.5 })] }, /occurred_at/],
     ["non-http page url", { events: [event({ page_url: "javascript:alert(1)" })] }, /page_url/],
+    ["user_agent not a string", { events: [event({ user_agent: 42 })] }, /user_agent/],
+    ["user_agent too long", { events: [event({ user_agent: "a".repeat(LIMITS.maxUserAgentLength + 1) })] }, /user_agent/],
+    ["user_agent only control characters", { events: [event({ user_agent: "\u0000\n" })] }, /user_agent/],
     ["properties not an object", { events: [event({ properties: [1] })] }, /properties/],
     ["properties too large", { events: [event({ properties: { x: "y".repeat(LIMITS.maxPropertiesBytes) } })] }, /exceed/],
     ["too many events", { events: Array.from({ length: LIMITS.maxEventsPerRequest + 1 }, (_, i) => event({ event_id: `e${i}` })) }, /at most/],
@@ -94,6 +97,14 @@ describe("toRows", () => {
     assert.equal(rows.recordings[0].chunk_id, "rec_1:3:0");
     assert.equal(rows.recordings[0].payload_bytes, 10);
     assert.equal(rows.recordings[0].source, "browser");
+  });
+
+  it("strips control characters from user_agent and prefers it over the request header", () => {
+    const result = request({ events: [event({ user_agent: "Googlebot\r\nX-Injected: 1" }), event({ event_id: "evt_2" })] });
+    assert.ok(result.ok);
+    const rows = toRows(result.request, { receivedAt: NOW, source: "browser", userAgent: "HeaderUA/1.0" });
+    assert.equal(rows.events[0].user_agent, "Googlebot  X-Injected: 1");
+    assert.equal(rows.events[1].user_agent, "HeaderUA/1.0");
   });
 });
 

@@ -13,7 +13,7 @@
 // Without localStorage (blocked storage, SSR) IDs live in memory for the page only.
 
 import { RecordingChunker, type RrwebEvent } from "./chunker.ts";
-import { type EventInput, parseCollectRequest, PROTOCOL_VERSION, type Properties } from "./protocol.ts";
+import { type EventInput, LIMITS, parseCollectRequest, PROTOCOL_VERSION, type Properties } from "./protocol.ts";
 import { type AnalyticsError, BatchQueue } from "./queue.ts";
 import { DEFAULT_ALLOWED_QUERY_PARAMS, SDK_VERSION, sanitizeUrl, uuid } from "./util.ts";
 
@@ -55,9 +55,12 @@ export type AnalyticsOptions = {
 export type Analytics = {
   /**
    * Queue a product-defined event. Properties are JSON; null and empty objects are removed.
+   * The page URL, referrer, and browser user agent are attached automatically; pass `options`
+   * to override them per event (for example in test harnesses simulating crawlers or campaigns).
+   * Overrides go through the same URL sanitization; an empty referrer means none.
    * Returns the event ID, or undefined when the event was rejected locally or the client is stopped.
    */
-  sendEvent(name: string, properties?: Properties): string | undefined;
+  sendEvent(name: string, properties?: Properties, options?: { userAgent?: string; pageUrl?: string; referrer?: string }): string | undefined;
   /** Queue one emitted rrweb event. Mask sensitive content before calling this. */
   sendRecording(event: RrwebEvent): void;
   setUserId(userId: string | undefined): void;
@@ -217,7 +220,7 @@ export function createAnalytics(options: AnalyticsOptions): Analytics {
   }
 
   return {
-    sendEvent(name, properties) {
+    sendEvent(name, properties, options) {
       if (stopped) return undefined;
       const now = Date.now();
       const event: EventInput = {
@@ -228,11 +231,15 @@ export function createAnalytics(options: AnalyticsOptions): Analytics {
         anonymous_id: anonymousId,
         properties: properties ?? {},
       };
-      const pageUrl = sanitizeUrl(location(), allowedQueryParams);
-      const ref = sanitizeUrl(referrer(), allowedQueryParams);
+      const pageUrl = sanitizeUrl(options?.pageUrl ?? location(), allowedQueryParams);
+      const ref = sanitizeUrl(options?.referrer ?? referrer(), allowedQueryParams);
+      // Truncate the automatic value so an unusually long browser UA never rejects every event.
+      const userAgent =
+        options?.userAgent ?? (typeof navigator === "undefined" ? undefined : navigator.userAgent.slice(0, LIMITS.maxUserAgentLength));
       if (userId) event.user_id = userId;
       if (pageUrl) event.page_url = pageUrl;
       if (ref) event.referrer = ref;
+      if (userAgent) event.user_agent = userAgent;
       // Validate exactly like the collector so one bad event never rejects a whole batch.
       const checked = parseCollectRequest({ v: PROTOCOL_VERSION, sent_at: now, events: [event] }, now);
       if (!checked.ok) {

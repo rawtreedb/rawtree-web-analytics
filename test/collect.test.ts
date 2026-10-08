@@ -68,6 +68,14 @@ describe("handleCollect", () => {
     assert.equal(byTable["/v1/tables/recordings"].rows[0].chunk_id, "rec_1:0:0");
   });
 
+  it("stores the request User-Agent when the event carries none", async () => {
+    const { inserts, fetch } = rawtree();
+    const response = await collect(post(body(), { origin: ORIGIN, "user-agent": "Mozilla/5.0 Test" }), fetch);
+    assert.equal(response.status, 200);
+    const events = inserts.find((i) => i.url.pathname === "/v1/tables/events");
+    assert.equal(events?.rows[0].user_agent, "Mozilla/5.0 Test");
+  });
+
   it("uses the same deduplication token when a batch is retried", async () => {
     const first = rawtree();
     const second = rawtree();

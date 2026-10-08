@@ -135,7 +135,13 @@ export async function handleCollect(
   const parsed = parseCollectRequest(body, receivedAt);
   if (!parsed.ok) return json(400, { error: "invalid_request", message: parsed.error }, cors);
 
-  const rows = toRows(parsed.request, { receivedAt, source });
+  const rows = toRows(parsed.request, {
+    receivedAt,
+    source,
+    // The request's User-Agent header fills in when an event carries none. A
+    // producer-supplied user_agent wins so test clients can simulate crawlers.
+    userAgent: request.headers.get("user-agent")?.slice(0, LIMITS.maxUserAgentLength) || undefined,
+  });
   try {
     await Promise.all([
       insertRows(resolved.rawtree, "events", rows.events, fetchImpl),

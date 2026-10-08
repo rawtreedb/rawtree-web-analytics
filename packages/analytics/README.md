@@ -25,6 +25,8 @@ analytics.reset();                // on logout
 analytics.stop();                 // consent withdrawn
 ```
 
+Page URL, referrer, and user agent come from the browser. Override them per event with `sendEvent(name, properties, { pageUrl, referrer, userAgent })`, for example to simulate crawlers or campaign visits in tests. Overrides are sanitized the same way, and `referrer: ""` means none.
+
 Nothing is tracked automatically. Event names and properties are yours. See the [tracking recipes](../../examples/test-console/recipes/RECIPES.md) for page views, CTA clicks, scroll depth, web vitals, signups, and more.
 
 | Option | Default | Meaning |
@@ -53,7 +55,7 @@ analytics.discardRecording();
 ```
 
 `startRecording` applies these defaults:
-- Inputs and all text are masked.
+- Inputs and all text are masked. Pass `maskAllText: false` for readable text (inputs stay masked).
 - Elements with class `rr-block` are blocked.
 - Canvas, fonts, and inlined images are off.
 
@@ -62,6 +64,17 @@ It also sanitizes every event before queuing:
 - URL attributes (`href`, `src`, `action`, …) lose their query string and hash.
 - `title`, `alt`, `aria-label`, and `placeholder` are masked.
 - Any other attribute containing an email address is masked.
+
+Every other [rrweb record option](https://github.com/rrweb-io/rrweb/blob/master/guide.md#options) passes through and overrides the defaults: `maskAllInputs`, `maskTextSelector`, `maskTextClass`, `blockClass`, `blockSelector`, `sampling`, and so on. For example, readable text with sensitive regions masked, and a smoother cursor:
+
+```ts
+startRecording(analytics, {
+  maskAllText: false,             // page text readable; inputs still masked
+  maskTextSelector: ".private",   // mask text only inside these elements
+  blockSelector: "[data-no-record]",
+  sampling: { mousemove: 30, mousemoveCallback: 200 }, // ms between mouse samples / flushes
+});
+```
 
 Review your DOM for other sensitive attributes. If you call `analytics.sendRecording(event)` with your own rrweb setup, masking is your responsibility. `sanitizeRecordingEvent` is exported to help.
 

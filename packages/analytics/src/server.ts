@@ -30,6 +30,8 @@ export type ServerEventContext = {
   anonymousId?: string;
   sessionId?: string;
   pageUrl?: string;
+  /** Stored as the event's user agent; the collector otherwise falls back to the request header. */
+  userAgent?: string;
 };
 
 export type ServerAnalytics = {
@@ -51,6 +53,7 @@ export function createServerAnalytics(options: ServerAnalyticsOptions): ServerAn
       if (context.anonymousId) event.anonymous_id = context.anonymousId;
       if (context.sessionId) event.session_id = context.sessionId;
       if (context.pageUrl) event.page_url = context.pageUrl;
+      if (context.userAgent) event.user_agent = context.userAgent;
       const body = { v: PROTOCOL_VERSION, sent_at: now, sdk: SDK, events: [event] };
       const checked = parseCollectRequest(body, now);
       if (!checked.ok) throw new Error(`Invalid analytics event: ${checked.error}`);

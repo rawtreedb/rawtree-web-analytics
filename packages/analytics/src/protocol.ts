@@ -18,6 +18,8 @@ export const LIMITS = {
   maxUrlLength: 2048,
   maxPropertiesBytes: 16_384,
   maxPropertiesDepth: 6,
+  /** Largest user_agent string accepted per event. */
+  maxUserAgentLength: 512,
   /** Largest payload slice in one recording part (before JSON string escaping). */
   maxPartPayloadBytes: 256 * 1024,
 } as const;
@@ -38,6 +40,8 @@ export type EventInput = {
   /** Sanitized URL (no credentials or hash; only allowlisted query parameters). */
   page_url?: string;
   referrer?: string;
+  /** Producer-supplied user agent. The collector falls back to the request's User-Agent header. */
+  user_agent?: string;
   properties?: Properties;
 };
 
@@ -87,6 +91,7 @@ export type EventRow = {
   page_url?: string;
   page_path?: string;
   referrer?: string;
+  user_agent?: string;
   properties: Properties;
 };
 
@@ -106,6 +111,7 @@ export type ValidationResult =
 
 const ID = /^[A-Za-z0-9_:.\-]+$/;
 const EVENT_NAME = /^[A-Za-z0-9_.:\-/ ]+$/;
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 const MIN_TIMESTAMP = Date.UTC(2000, 0, 1);
 const encoder = new TextEncoder();
 
@@ -149,6 +155,17 @@ function url(value: unknown, field: string): string | undefined {
     fail(`${field} must be an http(s) URL up to ${LIMITS.maxUrlLength} characters`);
   }
   return value;
+}
+
+/** Trimmed, control-character-free user agent up to LIMITS.maxUserAgentLength. */
+function userAgent(value: unknown, field: string): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") fail(`${field} must be a string`);
+  const cleaned = value.replace(CONTROL_CHARS, " ").trim();
+  if (cleaned.length === 0 || cleaned.length > LIMITS.maxUserAgentLength) {
+    fail(`${field} must be 1-${LIMITS.maxUserAgentLength} characters`);
+  }
+  return cleaned;
 }
 
 /**
@@ -207,6 +224,7 @@ function parseEvent(value: unknown, index: number, now: number): EventInput {
     user_id: id(value.user_id, `events[${index}].user_id`, true),
     page_url: url(value.page_url, `events[${index}].page_url`),
     referrer: url(value.referrer, `events[${index}].referrer`),
+    user_agent: userAgent(value.user_agent, `events[${index}].user_agent`),
   };
   for (const [key, item] of Object.entries(optional)) if (item !== undefined) Object.assign(event, { [key]: item });
   return event;
@@ -275,7 +293,10 @@ function pagePath(pageUrl: string | undefined): string | undefined {
 }
 
 /** Map a validated request to the rows stored in RawTree. */
-export function toRows(request: CollectRequest, context: { receivedAt: number; source: EventSource }) {
+export function toRows(
+  request: CollectRequest,
+  context: { receivedAt: number; source: EventSource; /** Fallback when an event carries no user_agent. */ userAgent?: string },
+) {
   const events: EventRow[] = (request.events ?? []).map((event) => {
     const row: EventRow = {
       v: PROTOCOL_VERSION,
@@ -295,6 +316,7 @@ export function toRows(request: CollectRequest, context: { receivedAt: number; s
       page_url: event.page_url,
       page_path: pagePath(event.page_url),
       referrer: event.referrer,
+      user_agent: event.user_agent ?? context.userAgent,
     };
     for (const [key, value] of Object.entries(optional)) if (value !== undefined) Object.assign(row, { [key]: value });
     return row;
