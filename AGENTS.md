@@ -2,6 +2,10 @@
 
 Read `IMPLEMENTATION.md` first: it holds the plan, milestone status, and session ledger. Update the ledger when you finish a session.
 
+## Scope
+
+Keep it simple. The project is only: an SDK to send events, examples, a dashboard, and a small agent. Anything beyond that needs the owner's agreement first. Write tests that catch real regressions in those pieces, not tests for their own sake.
+
 ## Layout
 
 - `packages/analytics/`: the publishable SDK (`@rawtree/analytics`). `src/protocol.ts` is the event contract; its types and validator are the source of truth for the SDK and the collector.
