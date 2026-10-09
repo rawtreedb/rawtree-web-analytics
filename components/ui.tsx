@@ -7,6 +7,7 @@ import type { ComponentProps, CSSProperties, ReactNode } from "react";
 import type { CrawlerCategory } from "../lib/crawlers.ts";
 import { twMerge } from "tailwind-merge";
 import { formatValue, type ValueFormat } from "../lib/format.ts";
+import { Tooltip } from "./tooltip.tsx";
 
 export function cn(...classes: (string | false | null | undefined)[]): string {
   return twMerge(classes);
@@ -65,20 +66,18 @@ export function Badge({ variant = "secondary", className, ...props }: ComponentP
   );
 }
 
-/** Small "i" marker whose explanation shows on hover (native title, no tooltip library). */
+/** Small "i" marker whose explanation shows on hover or focus. */
 export function InfoTip({ children }: { children: string }) {
   return (
-    <span
-      className="inline-grid size-4.5 flex-none cursor-help place-items-center text-extra-muted-foreground hover:text-primary"
-      title={children}
-      aria-label={children}
-      role="img"
+    <Tooltip
+      className="inline-grid size-4.5 flex-none cursor-help place-items-center rounded-full text-extra-muted-foreground outline-none hover:text-primary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+      content={children}
     >
-      <svg aria-hidden="true" className="size-4" fill="none" viewBox="0 0 16 16">
+      <svg aria-label="More info" className="size-4" fill="none" role="img" viewBox="0 0 16 16">
         <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.3" />
         <path d="M8 7.25v3.5M8 5.25h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
       </svg>
-    </span>
+    </Tooltip>
   );
 }
 

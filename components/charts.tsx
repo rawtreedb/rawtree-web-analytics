@@ -6,8 +6,12 @@
 import { type ReactNode, useId, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ComposedChart, Line, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDay, formatLongDay, formatValue, relativeChange, type ValueFormat } from "../lib/format.ts";
+import { Tooltip as HoverTip } from "./tooltip.tsx";
 import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, SegmentedControl, categoricalColors, chartColors, cn } from "./ui.tsx";
 
+const previousPeriodInfo = "Change versus the previous period of the same length.";
+// Dotted underline (a border, since text-decoration skips the inline-flex Delta) marks the change as hoverable.
+const deltaTrigger = "inline-flex cursor-help border-b border-dotted border-muted-foreground/60 pb-px outline-none hover:border-muted-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring";
 const tooltipClass = "min-w-44 max-w-72 rounded-lg border bg-card px-3 py-2.5 text-xs text-card-foreground shadow-popover";
 
 /** Decorative daily trend for stat cards. */
@@ -64,7 +68,10 @@ export function StatCard({
 }) {
   return (
     <article
-      className="relative flex min-h-34 flex-col gap-1.5 rounded-2xl bg-card px-4.5 pt-4 pb-3.5 text-card-foreground shadow-soft ring-1 ring-foreground/10"
+      className={cn(
+        "relative flex min-h-34 flex-col gap-1.5 rounded-2xl bg-card px-4.5 pt-4 text-card-foreground shadow-soft ring-1 ring-foreground/10",
+        trend && trend.length > 1 ? "pb-11" : "pb-3.5",
+      )}
       data-testid={`stat-${label.toLowerCase().replace(/ /g, "-")}`}
     >
       <header className="flex items-center gap-1">
@@ -75,8 +82,9 @@ export function StatCard({
       <div className="relative z-1 flex flex-1 flex-wrap content-start items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
         {change !== undefined ? (
           <>
-            <Delta inverse={inverse} kind={changeKind} neutral={neutral} value={change} />
-            <span>vs previous period</span>
+            <HoverTip className={deltaTrigger} content={previousPeriodInfo}>
+              <Delta inverse={inverse} kind={changeKind} neutral={neutral} value={change} />
+            </HoverTip>
           </>
         ) : null}
         {hint ? <span>{hint}</span> : null}
@@ -335,8 +343,9 @@ export function MetricChartCard({
             <strong className="numeric text-2xl font-semibold text-foreground">{formatValue(metric.total, metric.format)}</strong>
             {metric.previousTotal !== undefined ? (
               <>
-                <Delta neutral={metric.neutral} value={relativeChange(metric.total ?? null, metric.previousTotal)} />
-                <span>vs previous period</span>
+                <HoverTip className={deltaTrigger} content={previousPeriodInfo}>
+                  <Delta neutral={metric.neutral} value={relativeChange(metric.total ?? null, metric.previousTotal)} />
+                </HoverTip>
               </>
             ) : null}
           </div>
