@@ -1,0 +1,26 @@
+name: Feature Request
+description: Suggest an SDK, collector, or dashboard improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? We'd love to hear it. The project stays small on purpose: an SDK, a collector, a dashboard, and a test console.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe the feature or use case.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

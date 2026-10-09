@@ -1,10 +1,10 @@
 # rawtree-web-analytics
 
-Read `IMPLEMENTATION.md` first: it holds the plan, milestone status, and session ledger. Update the ledger when you finish a session.
+Read `README.md` for what the project does and how it's set up, and `CONTRIBUTING.md` for the checks every change must pass.
 
 ## Scope
 
-Keep it simple. The project is only: an SDK to send events, examples, and a dashboard. The in-app agent is deferred (see `IMPLEMENTATION.md`). Anything beyond that needs the owner's agreement first. Write tests that catch real regressions in those pieces, not tests for their own sake.
+Keep it simple. The project is only: an SDK to send events, examples, and a dashboard. AI agents query the data through the RawTree MCP; there is no in-app agent. Anything beyond that needs the owner's agreement first. Write tests that catch real regressions in those pieces, not tests for their own sake.
 
 ## Layout
 

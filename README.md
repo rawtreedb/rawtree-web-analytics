@@ -187,6 +187,8 @@ npm run typecheck
 npm run build        # SDK + Next.js
 ```
 
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). CI runs typecheck, tests, and build on every pull request, and Vercel deploys a preview for each pull request and production from `main`.
+
 Automated tests never touch your real tables: they use temporary tables named with `RAWTREE_TABLE_PREFIX`. Node runs the `.ts` sources directly, so use erasable syntax only and `.ts` extensions in relative imports.
 
 | Path | What |
@@ -196,8 +198,8 @@ Automated tests never touch your real tables: they use temporary tables named wi
 | `lib/` | Collector, RawTree client, dashboard SQL, crawler classifier, recording reassembly |
 | `examples/recipes/` | Tracking recipes (typechecked against the SDK) |
 | `test/` | Collector and dashboard tests |
-| `IMPLEMENTATION.md` | Plan, milestones, and the session ledger |
 | `AGENTS.md` | Guide for coding agents working in this repo |
+| `.github/` | CI workflow, pull request template, and issue forms |
 
 ## 📄 License
 

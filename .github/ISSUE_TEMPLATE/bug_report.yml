@@ -1,0 +1,54 @@
+name: Bug Report
+description: Report a bug in the SDK, the collector, or the dashboard
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please don't paste API keys, tokens, or private event data.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - SDK (@rawtree/analytics)
+        - Collector (/api/collect)
+        - Dashboard
+        - Recordings
+        - Console
+        - Sign-in (Vercel Connect or API key)
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "e.g. Chrome 141, Node 24, self-hosted on Vercel"
