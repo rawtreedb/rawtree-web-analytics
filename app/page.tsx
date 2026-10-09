@@ -3,6 +3,7 @@
 // Treewatcher's growth dashboard. All SQL lives in lib/queries.ts (run by getDashboard);
 // this page only shapes rows for display. Every count is deduplicated by ID in SQL.
 
+import { requireAccess, signInAgainIfRejected } from "../lib/access.ts";
 import { getDashboard, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../lib/dashboard.ts";
 import { summarizeCrawlers } from "../lib/crawlers.ts";
 import { DAY_MS, previousRange, resolveRange, toUtcDay, type ResolvedRange, type SearchParams } from "../lib/range.ts";
@@ -91,12 +92,14 @@ function RangeFilter({ range }: { range: ResolvedRange }) {
 // --- Page -------------------------------------------------------------------------------
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  const access = await requireAccess();
   const range = resolveRange(await searchParams);
   let data: DashboardData | null | undefined;
   let error: string | undefined;
   try {
-    data = await getDashboard(range);
+    data = await getDashboard(range, access.query);
   } catch (caught) {
+    signInAgainIfRejected(caught);
     error = queryErrorMessage(caught);
   }
 
@@ -118,7 +121,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {data ? (
         <Dashboard data={data} range={range} />
       ) : data === null ? (
-        <CardEmpty>No events yet. Add the SDK to your app (or send some from the test console) and they will show up here.</CardEmpty>
+        <CardEmpty>No events yet. Add the SDK to your app (or send some from the Console) and they will show up here.</CardEmpty>
       ) : (
         <ErrorCard>{error}</ErrorCard>
       )}
@@ -200,7 +203,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
             />
           ) : null}
         </StatGrid>
-        {noEvents ? <CardEmpty>No events in this range. Send some from the test console, or widen the date range.</CardEmpty> : null}
+        {noEvents ? <CardEmpty>No events in this range. Send some from the Console, or widen the date range.</CardEmpty> : null}
       </DashboardSection>
 
       <DashboardSection
@@ -264,8 +267,8 @@ function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React
     return (
       <DashboardSection description={description} id="acquisition" title="Acquisition">
         <CardEmpty>
-          No referrers stored yet. RawTree adds the referrer column with the first event that carries one: open the test console from a
-          link or a UTM-tagged URL to send one.
+          No referrers stored yet. RawTree adds the referrer column with the first event that carries one: send simulated campaign traffic
+          from the Console.
         </CardEmpty>
       </DashboardSection>
     );
@@ -445,7 +448,7 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
       <DashboardSection description={description} id="bots" title="Bots">
         <CardEmpty>
           No user agents stored yet. The SDK sends navigator.userAgent with every event (and the collector falls back to the request
-          header); RawTree adds the column with the first such event. Send simulated bot events from the test console to fill this section.
+          header); RawTree adds the column with the first such event. Send simulated bot traffic from the Console to fill this section.
         </CardEmpty>
       </DashboardSection>
     );

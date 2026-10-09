@@ -8,3 +8,7 @@ packages/analytics/LICENSE
 *.env
 .env*
 !.env.example
+
+# Vercel project link (local only)
+.vercel
+.env.vercel

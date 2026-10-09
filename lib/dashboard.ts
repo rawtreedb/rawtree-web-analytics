@@ -1,17 +1,15 @@
-// Dashboard data: runs the SQL in lib/queries.ts with the read-only key and returns typed
-// rows for the pages. Pages import only this module (no SQL, no RawTree client).
+// Dashboard data: runs the SQL in lib/queries.ts with the visitor's read config
+// (Access.query from lib/access.ts) and returns typed rows for the pages. Pages import only this module (no SQL, no RawTree client).
 
 import * as Q from "./queries.ts";
 import { previousRange, type Range } from "./range.ts";
-import { isMissingTable, loadRawTreeConfig, RawTreeError, runQuery, tableName, type RawTreeConfig } from "./rawtree.ts";
+import { isMissingTable, RawTreeError, runQuery, tableName, type RawTreeConfig } from "./rawtree.ts";
 import { planFetch, reassemble, type ChunkPlanRow, type ChunkRow, type RecordingGap } from "./reassembly.ts";
-
-const loadQueryConfig = (env?: Record<string, string | undefined>) => loadRawTreeConfig("RAWTREE_QUERY_KEY", env);
 
 /** The message a page shows for a failed query: RawTree's own error, or `fallback` (and a server log). */
 export function queryErrorMessage(
   error: unknown,
-  fallback = "Could not reach RawTree. Check the server logs and the RAWTREE_QUERY_KEY configuration.",
+  fallback = "Could not reach RawTree. Check the server logs and the RawTree configuration.",
 ): string {
   if (error instanceof RawTreeError) return error.message;
   console.error("RawTree query failed", error);
@@ -38,7 +36,7 @@ type ScrollStats = { views: number; reached25: number; reached50: number; reache
 export type DashboardData = NonNullable<Awaited<ReturnType<typeof getDashboard>>>;
 
 /** Every dashboard section for one window and its previous period, queried in parallel. */
-export async function getDashboard(range: Range, config: RawTreeConfig = loadQueryConfig(), fetchImpl?: typeof fetch) {
+export async function getDashboard(range: Range, config: RawTreeConfig, fetchImpl?: typeof fetch) {
   const run = <T>(sql: string) => runQuery<T>(config, sql, fetchImpl);
   const one = async <T>(sql: string) => (await run<T>(sql))[0]!; // aggregates without GROUP BY return one row
   const table = tableName(config, "events");
@@ -123,7 +121,7 @@ function validateRecordingId(recordingId: string): string {
 }
 
 /** The newest recording's ID, or undefined when there is none (including before the first recording). */
-export async function getLatestRecordingId(config: RawTreeConfig = loadQueryConfig()): Promise<string | undefined> {
+export async function getLatestRecordingId(config: RawTreeConfig): Promise<string | undefined> {
   try {
     return (await runQuery<{ recordingId: string }>(config, Q.latestRecording(tableName(config, "recordings"))))[0]?.recordingId;
   } catch (error) {
@@ -133,7 +131,7 @@ export async function getLatestRecordingId(config: RawTreeConfig = loadQueryConf
 }
 
 /** One recording's summary (undefined when not stored) and the 50 newest recordings. */
-export async function getRecording(recordingId: string, config: RawTreeConfig = loadQueryConfig()) {
+export async function getRecording(recordingId: string, config: RawTreeConfig) {
   const table = tableName(config, "recordings");
   const id = validateRecordingId(recordingId);
   const { summary, list } = await all({
@@ -163,7 +161,7 @@ type ReplayPayload = {
  * chunk range chosen by planFetch (bounded in bytes, starting at a full snapshot).
  * Reassembly reports gaps instead of replaying across them.
  */
-export async function getReplay(recordingId: string, config: RawTreeConfig = loadQueryConfig(), fetchImpl?: typeof fetch): Promise<ReplayPayload> {
+export async function getReplay(recordingId: string, config: RawTreeConfig, fetchImpl?: typeof fetch): Promise<ReplayPayload> {
   const table = tableName(config, "recordings");
   const id = validateRecordingId(recordingId);
   const metadata = await runQuery<ChunkPlanRow>(config, Q.chunkMetadata(table, id), fetchImpl);

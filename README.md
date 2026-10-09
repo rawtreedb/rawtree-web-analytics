@@ -8,9 +8,9 @@ Web analytics on [RawTree](https://rawtree.com): an SDK for events and session r
 - **Collector** (`/api/collect`): validates every batch against the event contract and writes it to RawTree with an insert-only key. It acknowledges only after RawTree accepted every row.
 - **Dashboard** (`/`): Overview, Traffic, Acquisition, Content, Engagement, and Bots for any date range, compared with the previous period. Bots are told apart by user agent and kept out of every human metric.
 - **Recordings** (`/recordings`): browse recent sessions and replay them in the browser.
-- **Test console** ([`examples/test-console`](examples/test-console)): a local-only app for sending test events, recordings, crawler visits, and campaign visits, and watching each one reach RawTree.
+- **Console** (`/console`): send test events, recordings, crawler visits, and campaign visits through the SDK, and watch each one reach RawTree.
 
-The dashboard and collector are one Next.js app, meant to be deployed. The test console is a development tool: run it on your machine, don't deploy it.
+The dashboard, console, and collector are one Next.js app, meant to be deployed.
 
 ## 🧭 How it works
 
@@ -29,15 +29,15 @@ flowchart LR
   browser -- "@rawtree/analytics" --> collector
   backend -- "@rawtree/analytics/server" --> collector
   collector -- "insert-only key" --> tables
-  tables -- "read-only key" --> dashboard
+  tables -- "read-only key or sign-in" --> dashboard
   tables -- "read-only key" --> agent
 ```
 
-The collector and the dashboard are the same Next.js app. The [test console](examples/test-console) plays "Your app" on your machine, sending through the same SDK to a local collector.
+The collector and the dashboard are the same Next.js app. Its Console page plays "Your app", sending through the same SDK to its own collect route.
 
 - Events and recording chunks are stored as rows. Sessions, recordings, and their completeness are derived in SQL, not kept in a mutable table.
 - Delivery is at least once, so event IDs stay stable across retries and every query deduplicates (`uniqExact(event_id)` or `LIMIT 1 BY`).
-- Credentials and table names come from server configuration, never from requests.
+- `/api/collect` writes only with the insert key from server configuration. The dashboard and console use either the server's keys or the signed-in visitor's own access, and only ever run the dashboard's own SQL: never SQL or table names from the browser.
 
 ## 🌳 Set up RawTree
 
@@ -63,28 +63,24 @@ npm install
 npm run dev                  # dashboard + collector on http://localhost:3000
 ```
 
-[`.env.example`](.env.example) documents every variable. Locally, keep `ANALYTICS_ALLOWED_ORIGINS=http://localhost:3001` so the test console can send events.
+[`.env.example`](.env.example) documents every variable. With both keys set, the dashboard opens without signing in. Leave `RAWTREE_QUERY_KEY` and `RAWTREE_INGEST_KEY` empty to try sign-in mode instead (see "Deploy the dashboard" below).
 
-## 🧪 Use the test console
+## 🧪 Use the console
 
-The console sends data through the SDK exactly as a real app would, using the packed `@rawtree/analytics` tarball.
-
-```sh
-npm run console:install                      # from the repo root: pack the SDK and install it in the console
-cd examples/test-console && npm start        # http://localhost:3001, reads ../../.env.local
-```
+Open **Console** in the dashboard's sidebar (`/console`). It sends data through `@rawtree/analytics` exactly as a real app would, to `/api/console/collect`: the same validation and insert path as `/api/collect`, but with your own credentials, so test data only lands in your database. It needs no allowed origin or server token.
 
 1. **Consent:** turn on Analytics. Nothing is sent before that. Turn on Session recording too if you want a replay.
 2. **Browser events:** send recipe-shaped events (`page_view`, `cta_click`, `scroll_depth`, and more) or a custom event with your own JSON.
-3. **Server events:** send backend events like `signup_completed` with a stable ID. Needs the same `ANALYTICS_SERVER_TOKEN` in the console and the collector. Resending keeps the same ID, and the dashboard still counts it once.
+3. **Server events:** send backend events like `signup_completed` with a stable ID, through `@rawtree/analytics/server` on the app's server. Resending keeps the same ID, and the dashboard still counts it once.
 4. **Simulated traffic:** send page views as crawlers (GPTBot, ClaudeBot, Googlebot, curl, and more) or as campaign visits (Google ad, newsletter, Hacker News). Each click is a new visitor. This is how you fill the Bots and Acquisition sections.
 5. **Recording playground:** change the page while recording, and check that the input, the `rr-block` region, and the sample secrets stay hidden. "Mask all text" switches to fully masked recordings.
 6. **Event viewer:** every row moves from Queued to Sent (collector 200) to Stored (found in RawTree). Reads lag writes by a moment, so Stored can take a few seconds.
 
-Everything you send goes to the database in `.env.local`. Use a separate test database (same setup, another name) if you don't want test data next to real traffic: RawTree can't delete individual rows yet.
+Everything you send goes to the database you're signed in to (or `RAWTREE_DATABASE` when the keys come from the environment). Use a separate test database (same setup, another name) if you don't want test data next to real traffic: RawTree can't delete individual rows yet.
 
 ## 📊 Use the dashboard
 
+- **Sign in:** only in sign-in mode. Connect with RawTree or paste an API key, and the sidebar shows which database you're looking at and a Sign out button.
 - **Date range:** the picker in the header has presets (Today, This week, Last 7 days, Last month, and more) and a calendar for custom ranges. Days are UTC. Every number is compared with the previous period of the same length.
 - **Humans only:** once events carry a user agent, every section except Bots excludes them. Before that, the sections show an "All traffic" badge.
 - **Sections:** Overview has the headline numbers. Traffic has the daily trend and breakdown. Acquisition shows channels, referrers, and UTM campaigns by each session's first touch. Content lists top pages. Engagement covers time on page, scroll depth, and CTA clicks. Bots shows bot page requests, crawler types, top crawlers, and the most crawled paths.
@@ -93,24 +89,48 @@ Everything you send goes to the database in `.env.local`. Use a separate test da
 
 ## ☁️ Deploy the dashboard
 
-Deploy the Next.js app (for example on Vercel) with these environment variables:
+Deploy the Next.js app (for example on Vercel) in one of two modes, chosen by its environment variables.
 
 | Variable | Value |
 | --- | --- |
 | `RAWTREE_API_URL` | Optional. Defaults to `https://api.rawtree.com` |
-| `RAWTREE_DATABASE` | Your analytics database |
-| `RAWTREE_INGEST_KEY` | The insert-only key, used by the collector |
-| `RAWTREE_QUERY_KEY` | The read-only key, used by the dashboard and replay |
+| `RAWTREE_DATABASE` | Your analytics database (used with the env keys) |
+| `RAWTREE_INGEST_KEY` | The insert-only key, used by the collector (and the console in env mode) |
+| `RAWTREE_QUERY_KEY` | The read-only key, used by the dashboard and replay in env mode |
+| `RAWTREE_CONNECTOR` | Optional, sign-in mode only. The Vercel Connect connector, e.g. `rawtree/web-analytics` |
 | `ANALYTICS_ALLOWED_ORIGINS` | The origins of the sites you track, e.g. `https://example.com` |
 | `ANALYTICS_SERVER_TOKEN` | Optional. A random secret for backend events |
 
-Then point the SDK at `https://<your-deployment>/api/collect`.
+Then point the SDK at `https://<your-deployment>/api/collect`. The collector always uses `RAWTREE_INGEST_KEY` and `RAWTREE_DATABASE`, in both modes. Without them it rejects events as not configured.
 
-Before you deploy, know what is public:
+### Env mode: a private dashboard
 
-- **The dashboard and recordings have no login.** Anyone with the URL sees your analytics and can replay recorded sessions. Keep recordings masked (the default) or put the app behind your own access control if that's not what you want.
+Set both `RAWTREE_QUERY_KEY` and `RAWTREE_INGEST_KEY`. There is no sign-in: **anyone with the URL sees your analytics, replays recorded sessions, and can send test data from the console.** Use it on your machine or behind your own access control (for example Vercel Deployment Protection).
+
+### Sign-in mode: a public dashboard
+
+Leave `RAWTREE_QUERY_KEY` and `RAWTREE_INGEST_KEY` unset. Every page asks visitors to sign in with their own RawTree access, and shows only their own database:
+
+- **Connect with RawTree** (when `RAWTREE_CONNECTOR` is set): the visitor approves access with their RawTree account through Vercel Connect, then picks the organization, cluster, and database. The browser only holds an opaque, HTTP-only session cookie; Vercel Connect stores and refreshes the grant. Sign out revokes it.
+- **Use an API key:** the visitor pastes one key and a database name (default `web_analytics`). The key must **read and write** that database: the dashboard reads it and the console writes test events to it. Create one with `rtree key create --name web-analytics --permission read_write --database web_analytics`. Permission keys cover the whole cluster; a key limited to one database needs a role with `GRANT SELECT, INSERT ON web_analytics.*`, and then create the tables first. The key is kept in an HTTP-only session cookie until sign-out or the browser closes.
+
+RawTree OAuth grants are not read-only, so the server only runs the dashboard's own queries ([`lib/queries.ts`](lib/queries.ts)) and collector-validated inserts with them. It never accepts SQL or table names from the browser.
+
+To enable Connect, create a Vercel Connect connector for the RawTree API from the linked project directory and expose its UID as `RAWTREE_CONNECTOR`:
+
+```sh
+vercel link
+vercel connect create rawtree --target api --name <name>
+vercel env add RAWTREE_CONNECTOR   # e.g. rawtree/<name>
+vercel env pull                    # for local development: gives the SDK the project's OIDC token
+```
+
+Connect needs a Vercel deployment (or `vercel env pull` locally). Elsewhere, visitors sign in with an API key.
+
+### Before you deploy
+
 - **The collector accepts events from the allowed origins** and doesn't rate limit. Origin checks stop other websites' browsers, not scripts, so add rate limiting for `/api/collect` on your platform if you need it (for example a firewall rule on Vercel).
-- **Don't deploy the test console.** It holds the server token and is built for local testing.
+- **Recordings replay what was recorded.** Keep recordings masked (the default) unless you're sure about what your pages show.
 
 ## ✍️ Add it to your app
 
@@ -136,7 +156,7 @@ WHERE toString(event_name) = 'checkout_started'
 GROUP BY plan
 ```
 
-Nothing is tracked automatically: event names and properties are yours. The [SDK README](packages/analytics/README.md) covers options, backend events, and recording privacy. The [tracking recipes](examples/test-console/recipes/RECIPES.md) show page views, CTA clicks, scroll depth, web vitals, signups, and their queries.
+Nothing is tracked automatically: event names and properties are yours. The [SDK README](packages/analytics/README.md) covers options, backend events, and recording privacy. The [tracking recipes](examples/recipes/RECIPES.md) show page views, CTA clicks, scroll depth, web vitals, signups, and their queries.
 
 ## 🤖 Ask your AI agent
 
@@ -151,7 +171,7 @@ Give the agent these rules so its numbers match the dashboard:
 - Page views are `event_name = 'page_view'`, with `page_path`, `page_url`, and `referrer` on the row.
 - Bots are told apart by `user_agent`. The dashboard's pattern is `BOT_UA_PATTERN` in [`lib/crawlers.ts`](lib/crawlers.ts).
 
-The [tracking recipes](examples/test-console/recipes/RECIPES.md) and [`lib/queries.ts`](lib/queries.ts) (every dashboard query) have more queries to borrow from.
+The [tracking recipes](examples/recipes/RECIPES.md) and [`lib/queries.ts`](lib/queries.ts) (every dashboard query) have more queries to borrow from.
 
 ## 🔒 Privacy notes
 
@@ -165,7 +185,6 @@ The [tracking recipes](examples/test-console/recipes/RECIPES.md) and [`lib/queri
 npm test             # builds the SDK, runs SDK and collector/dashboard tests
 npm run typecheck
 npm run build        # SDK + Next.js
-cd examples/test-console && npx tsc --noEmit && npm run build && npm run size && npm run smoke
 ```
 
 Automated tests never touch your real tables: they use temporary tables named with `RAWTREE_TABLE_PREFIX`. Node runs the `.ts` sources directly, so use erasable syntax only and `.ts` extensions in relative imports.
@@ -173,9 +192,9 @@ Automated tests never touch your real tables: they use temporary tables named wi
 | Path | What |
 | --- | --- |
 | `packages/analytics/` | The SDK. `src/protocol.ts` is the event contract for both the SDK and the collector |
-| `app/`, `components/` | Dashboard, recordings, and the collector route |
+| `app/`, `components/` | Dashboard, recordings, console, and the collector routes |
 | `lib/` | Collector, RawTree client, dashboard SQL, crawler classifier, recording reassembly |
-| `examples/test-console/` | Test console and tracking recipes |
+| `examples/recipes/` | Tracking recipes (typechecked against the SDK) |
 | `test/` | Collector and dashboard tests |
 | `IMPLEMENTATION.md` | Plan, milestones, and the session ledger |
 | `AGENTS.md` | Guide for coding agents working in this repo |

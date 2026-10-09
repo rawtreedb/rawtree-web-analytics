@@ -1,8 +1,9 @@
 // One recording in the player, with the 50 most recent recordings in a sidebar to browse.
-// Metadata comes from the read-only key; payloads are fetched and reassembled through
+// Metadata comes from the visitor's read access; payloads are fetched and reassembled through
 // /api/recordings/[id] in bounded parts.
 
 import Link from "next/link";
+import { requireAccess, signInAgainIfRejected } from "../../../lib/access.ts";
 import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../lib/dashboard.ts";
 import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../lib/format.ts";
 import { Badge, ErrorCard, PageToolbar, cn } from "../../../components/ui.tsx";
@@ -56,13 +57,15 @@ function RecordingList({ recordings, selectedId }: { recordings: RecordingListIt
 }
 
 export default async function RecordingPage({ params }: { params: Promise<{ id: string }> }) {
+  const access = await requireAccess();
   const { id } = await params;
   let summary: RecordingListItem | undefined;
   let recordings: RecordingListItem[] = [];
   let error: string | undefined;
   try {
-    ({ recording: summary, recordings } = await getRecording(id));
+    ({ recording: summary, recordings } = await getRecording(id, access.query));
   } catch (caught) {
+    signInAgainIfRejected(caught);
     error = queryErrorMessage(caught);
   }
 

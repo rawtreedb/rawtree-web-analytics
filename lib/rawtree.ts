@@ -1,16 +1,29 @@
-// Server-only RawTree HTTP client: configuration, reads with the query key, and
-// acknowledged inserts with the ingest key. Destinations come from configuration only.
+// Server-only RawTree HTTP client: configuration, reads, and acknowledged inserts.
+// Credentials and destinations come from configuration or the visitor's sign-in (lib/access.ts),
+// never from request bodies.
 
 import { createHash } from "node:crypto";
 
 export type RawTreeConfig = {
   apiUrl: string;
   database: string;
-  /** The ingest key (collector) or the read-only query key (dashboard). */
+  /** A RawTree API key: the env ingest or query key, or the visitor's own key. Empty with `connect`. */
   key: string;
   /** Prefix for table names, e.g. "e2e_" for disposable test tables. Empty in production. */
   tablePrefix: string;
+  /** Vercel Connect sign-in: a short-lived token and the picked organization and cluster. */
+  connect?: {
+    organization: string;
+    cluster: string;
+    /** Resolves the visitor's token; throws a 401 RawTreeError when they must connect again. */
+    token: () => Promise<string>;
+    /** Called when RawTree rejects the token, to drop it from the cache. */
+    onUnauthorized: () => void;
+  };
 };
+
+/** RawTree API base URL from the environment (all modes). */
+export const rawTreeApiUrl = (env: Record<string, string | undefined> = process.env) => (env.RAWTREE_API_URL || "https://api.rawtree.com").replace(/\/$/, "");
 
 /** RawTree settings from the environment, with the ingest or the query key. */
 export function loadRawTreeConfig(
@@ -20,7 +33,7 @@ export function loadRawTreeConfig(
   const missing = ["RAWTREE_DATABASE", keyName].filter((name) => !env[name]);
   if (missing.length > 0) throw new Error(`Missing configuration: ${missing.join(", ")}`);
   return {
-    apiUrl: (env.RAWTREE_API_URL || "https://api.rawtree.com").replace(/\/$/, ""),
+    apiUrl: rawTreeApiUrl(env),
     database: env.RAWTREE_DATABASE ?? "",
     key: env[keyName] ?? "",
     tablePrefix: env.RAWTREE_TABLE_PREFIX ?? "",
@@ -45,18 +58,42 @@ export const isMissingTable = (error: unknown) => error instanceof RawTreeError 
 
 export type Row = Record<string, string | number | boolean>;
 
+/** One authenticated RawTree call. Connect calls log one outcome line (no token, SQL, or body). */
+async function send(config: RawTreeConfig, path: string, params: URLSearchParams, init: RequestInit, fetchImpl: typeof fetch): Promise<Response> {
+  const { connect } = config;
+  // Env mode builds its config without failing, so a missing database surfaces here, in the page's error card.
+  if (!config.database) throw new RawTreeError("Missing configuration: RAWTREE_DATABASE. Set it to the database that holds the events and recordings tables.", 500);
+  if (connect) {
+    params.set("organization", connect.organization);
+    params.set("cluster", connect.cluster);
+    params.set("database", config.database);
+  }
+  const key = connect ? await connect.token() : config.key;
+  const started = Date.now();
+  const response = await fetchImpl(`${config.apiUrl}${path}${params.size ? `?${params}` : ""}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+  });
+  if (connect) {
+    const outcome = `RawTree ${init.method} ${path} (${connect.organization}/${connect.cluster}/${config.database}) -> ${response.status} in ${Date.now() - started} ms`;
+    if (response.ok) console.info(outcome);
+    else console.warn(outcome);
+    if (response.status === 401) connect.onUnauthorized();
+  }
+  return response;
+}
+
 /**
  * Run one read statement and return its rows. Values are coerced by the result's column
  * types (numbers, booleans, everything else a string), so string IDs that look numeric
  * stay strings. Cast Dynamic columns in SQL to get a number or boolean back.
  */
 export async function runQuery<T = Row>(config: RawTreeConfig, sql: string, fetchImpl: typeof fetch = fetch): Promise<T[]> {
-  const response = await fetchImpl(`${config.apiUrl}/v1/query`, {
+  const response = await send(config, "/v1/query", new URLSearchParams(), {
     method: "POST",
-    headers: { Authorization: `Bearer ${config.key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ sql, database: config.database }),
     signal: AbortSignal.timeout(30_000),
-  });
+  }, fetchImpl);
   const text = await response.text();
   if (!response.ok) throw new RawTreeError(`RawTree query failed: ${text.slice(0, 300)}`, response.status);
   const { meta = [], data = [] } = JSON.parse(text) as { meta?: { name: string; type: string }[]; data?: Record<string, unknown>[] };
@@ -81,17 +118,12 @@ export async function insertRows(
   const token = createHash("sha256")
     .update(`${table}\n${rows.map((row) => row.event_id ?? row.chunk_id).join("\n")}`)
     .digest("hex");
-  const params = new URLSearchParams({
-    database: config.database,
-    deduplicate_insert: "enable",
-    insert_deduplication_token: token,
-  });
-  const response = await fetchImpl(`${config.apiUrl}/v1/tables/${tableName(config, table)}?${params}`, {
+  const params = new URLSearchParams({ database: config.database, deduplicate_insert: "enable", insert_deduplication_token: token });
+  const response = await send(config, `/v1/tables/${tableName(config, table)}`, params, {
     method: "POST",
-    headers: { Authorization: `Bearer ${config.key}`, "Content-Type": "application/json" },
     body: JSON.stringify(rows),
     signal: AbortSignal.timeout(20_000),
-  });
+  }, fetchImpl);
   const text = await response.text();
   if (!response.ok) throw new RawTreeError(`RawTree insert into ${table} failed: ${text.slice(0, 300)}`, response.status);
   // A deduplicated retry may report fewer rows than sent; anything else must match.
