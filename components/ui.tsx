@@ -56,10 +56,10 @@ const badgeVariants: Record<BadgeVariant, string> = {
   secondary: "border-border bg-secondary text-muted-foreground",
 };
 
-export function Badge({ variant = "secondary", className = "", ...props }: ComponentProps<"span"> & { variant?: BadgeVariant }) {
+export function Badge({ variant = "secondary", className, ...props }: ComponentProps<"span"> & { variant?: BadgeVariant }) {
   return (
     <span
-      className={`inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-4xl border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${badgeVariants[variant]} ${className}`}
+      className={cn("inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-4xl border px-2 py-0.5 text-xs font-medium whitespace-nowrap", badgeVariants[variant], className)}
       {...props}
     />
   );
@@ -299,7 +299,6 @@ export function BarList({
 }) {
   const max = Math.max(0, ...items.map((item) => Math.abs(item.value)));
   const sum = total ?? items.reduce((acc, item) => acc + item.value, 0);
-  const share = new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: 1 });
   return (
     <table
       className="w-full table-auto border-separate border-spacing-x-0 border-spacing-y-1 text-xs"
@@ -341,7 +340,7 @@ export function BarList({
               </td>
             ))}
             <td className={numericCell}>{formatValue(item.value, format)}</td>
-            {columns.share ? <td className={numericCell}>{sum === 0 ? "–" : share.format(item.value / sum)}</td> : null}
+            {columns.share ? <td className={numericCell}>{formatValue(item.value / sum, "percent")}</td> : null}
             {columns.change ? (
               <td className={numericCell}>
                 <Delta emptyLabel="–" value={item.change ?? null} />
@@ -400,6 +399,40 @@ const segmentGroup = "no-scrollbar inline-flex max-w-full gap-0.5 overflow-x-aut
 const segmentItem =
   "inline-flex h-7 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border border-transparent px-3 text-xs font-semibold text-foreground/60 transition-colors hover:text-foreground data-active:border-border data-active:bg-background data-active:text-foreground data-active:shadow-soft";
 
+/** Pill-shaped single-choice control for switching a view, metric, or playback option. */
+export function SegmentedControl<T extends string>({
+  label,
+  items,
+  value,
+  onValueChange,
+  itemClassName,
+}: {
+  label: string;
+  items: readonly { value: T; label: string; title?: string }[];
+  value: T;
+  onValueChange: (value: T) => void;
+  itemClassName?: string;
+}) {
+  return (
+    <div aria-label={label} className={segmentGroup} role="radiogroup">
+      {items.map((item) => (
+        <button
+          aria-checked={item.value === value}
+          className={cn(segmentItem, itemClassName)}
+          data-active={item.value === value || undefined}
+          key={item.value}
+          onClick={() => onValueChange(item.value)}
+          role="radio"
+          title={item.title}
+          type="button"
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** Pill-shaped segmented control as links, for filters kept in the URL. */
 export function SegmentedLinks({ label, items }: { label: string; items: readonly { href: string; label: string; active: boolean }[] }) {
   return (
@@ -412,8 +445,6 @@ export function SegmentedLinks({ label, items }: { label: string; items: readonl
     </nav>
   );
 }
-
-export { segmentGroup, segmentItem };
 
 /**
  * Sticky page header with the title, meta line, and filters. It bleeds to the main

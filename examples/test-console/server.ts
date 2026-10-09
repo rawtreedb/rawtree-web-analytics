@@ -74,12 +74,9 @@ async function serverEvent(body: Record<string, unknown>): Promise<{ status: num
   if (typeof properties !== "object" || properties === null || Array.isArray(properties)) {
     return { status: 400, body: { ok: false, error: "properties must be an object" } };
   }
-  if (body.eventId !== undefined && (typeof body.eventId !== "string" || !ID.test(body.eventId))) {
-    return { status: 400, body: { ok: false, error: "invalid eventId" } };
-  }
   const [prefix, kind] = ID_PREFIX[name] ?? [name.replace(/[^A-Za-z0-9_]/g, "_"), "evt"];
   const outcomeId = `${kind}_${randomBytes(9).toString("hex")}`;
-  const eventId = (body.eventId as string | undefined) ?? `${prefix}:${outcomeId}`;
+  const eventId = String(body.eventId ?? `${prefix}:${outcomeId}`); // the SDK validates it
   const userId = kind === "acct" ? eventId.slice(prefix.length + 1) : undefined;
 
   // Capture the request as sent and the collector's last answer to show them in the UI.
@@ -124,10 +121,13 @@ async function stored(body: Record<string, unknown>): Promise<unknown> {
   if (!QUERY_KEY || !DATABASE) return { configured: false };
   const eventIds = ids(body.eventIds);
   const recordingIds = ids(body.recordingIds);
+  // Bound the event scan: the console polls events for 30 s after sending them. Recordings stay
+  // unbounded because one recording's parts can span longer than any window.
+  const recent = `AND CAST(received_at_ms AS Int64) > ${Date.now() - 10 * 60_000}`;
   const [eventRows, recordingRows] = await Promise.all([
     eventIds.length === 0
       ? []
-      : query(`SELECT toString(event_id) AS id, count() AS n FROM ${TABLE_PREFIX}events WHERE toString(event_id) IN (${inList(eventIds)}) GROUP BY id`),
+      : query(`SELECT toString(event_id) AS id, count() AS n FROM ${TABLE_PREFIX}events WHERE toString(event_id) IN (${inList(eventIds)}) ${recent} GROUP BY id`),
     recordingIds.length === 0
       ? []
       : query(

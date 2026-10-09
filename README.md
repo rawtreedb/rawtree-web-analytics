@@ -89,6 +89,7 @@ Everything you send goes to the database in `.env.local`. Use a separate test da
 - **Humans only:** once events carry a user agent, Overview, Traffic, Acquisition, and Content exclude bots. Before that, the sections show an "All traffic" badge.
 - **Sections:** Overview has the headline numbers. Traffic has the daily trend and breakdown. Acquisition shows channels, referrers, and UTM campaigns by each session's first touch. Content lists top pages. Engagement covers time on page, scroll depth, and CTA clicks. Bots shows bot page requests, crawler types, top crawlers, and the most crawled paths.
 - **Recordings:** pick a session from the list on the left and replay it. Pause, seek, and change speed from the controls under the player. Incomplete recordings replay only their complete stretches and say what was skipped.
+- **Tune a widget:** every dashboard query lives in [`lib/queries.ts`](lib/queries.ts), one documented template per widget. Edit the SQL there (for example add a channel host to `SEARCH_HOSTS` or change `ENGAGED_MS`). The aliases are the field names the page reads: if you add or rename one, update that query's row type in `lib/dashboard.ts` and its use in `app/page.tsx`.
 
 ## ☁️ Deploy the dashboard
 
@@ -96,7 +97,7 @@ Deploy the Next.js app (for example on Vercel) with these environment variables:
 
 | Variable | Value |
 | --- | --- |
-| `RAWTREE_API_URL` | `https://api.rawtree.com` |
+| `RAWTREE_API_URL` | Optional. Defaults to `https://api.rawtree.com` |
 | `RAWTREE_DATABASE` | Your analytics database |
 | `RAWTREE_INGEST_KEY` | The insert-only key, used by the collector |
 | `RAWTREE_QUERY_KEY` | The read-only key, used by the dashboard and replay |
@@ -148,9 +149,9 @@ Give the agent these rules so its numbers match the dashboard:
 - Fields are dynamic JSON. Cast them: `toString(event_name)`, `CAST(occurred_at_ms AS Int64)`, `toString(properties.plan)`.
 - Time is `occurred_at_ms` (epoch milliseconds, UTC). Always filter on an explicit window.
 - Page views are `event_name = 'page_view'`, with `page_path`, `page_url`, and `referrer` on the row.
-- Bots are told apart by `user_agent`. The dashboard's pattern is `BOT_UA_PATTERN` in [`lib/dashboard.ts`](lib/dashboard.ts).
+- Bots are told apart by `user_agent`. The dashboard's pattern is `BOT_UA_PATTERN` in [`lib/crawlers.ts`](lib/crawlers.ts).
 
-The [tracking recipes](examples/test-console/recipes/RECIPES.md) and [`lib/dashboard.ts`](lib/dashboard.ts) have more queries to borrow from.
+The [tracking recipes](examples/test-console/recipes/RECIPES.md) and [`lib/queries.ts`](lib/queries.ts) (every dashboard query) have more queries to borrow from.
 
 ## 🔒 Privacy notes
 

@@ -6,40 +6,9 @@
 import { type ReactNode, useId, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ComposedChart, Line, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDay, formatLongDay, formatValue, relativeChange, type ValueFormat } from "../lib/format.ts";
-import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, categoricalColors, chartColors, cn, segmentGroup, segmentItem } from "./ui.tsx";
+import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, SegmentedControl, categoricalColors, chartColors, cn } from "./ui.tsx";
 
 const tooltipClass = "min-w-44 max-w-72 rounded-lg border bg-card px-3 py-2.5 text-xs text-card-foreground shadow-popover";
-
-/** Pill-shaped single-choice control for switching a view or metric. */
-export function SegmentedControl<T extends string>({
-  label,
-  items,
-  value,
-  onValueChange,
-}: {
-  label: string;
-  items: readonly { value: T; label: string }[];
-  value: T;
-  onValueChange: (value: T) => void;
-}) {
-  return (
-    <div aria-label={label} className={segmentGroup} role="radiogroup">
-      {items.map((item) => (
-        <button
-          aria-checked={item.value === value}
-          className={segmentItem}
-          data-active={item.value === value || undefined}
-          key={item.value}
-          onClick={() => onValueChange(item.value)}
-          role="radio"
-          type="button"
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /** Decorative daily trend for stat cards. */
 function Sparkline({ values, color = chartColors.primary, label }: { values: readonly number[]; color?: string; label: string }) {
@@ -121,8 +90,6 @@ export function StatCard({
   );
 }
 
-const percent = new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: 1 });
-
 /** Share-of-total donut with a legend. Slices beyond `maxSlices` are grouped as "Other". */
 export function DonutChart({
   items,
@@ -167,7 +134,7 @@ export function DonutChart({
                 <div className={tooltipClass}>
                   <p className="mb-1.5 font-semibold">{String(item.name)}</p>
                   <p className="numeric">
-                    {formatValue(value)} · {percent.format(value / total)}
+                    {formatValue(value)} · {formatValue(value / total, "percent")}
                   </p>
                 </div>
               );
@@ -188,7 +155,7 @@ export function DonutChart({
               {slice.label}
             </span>
             <strong className="numeric font-semibold">{formatValue(slice.value)}</strong>
-            <span className="numeric w-13 flex-none text-right text-muted-foreground">{percent.format(slice.value / total)}</span>
+            <span className="numeric w-13 flex-none text-right text-muted-foreground">{formatValue(slice.value / total, "percent")}</span>
           </li>
         ))}
       </ul>

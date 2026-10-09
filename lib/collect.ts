@@ -5,10 +5,10 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import { LIMITS, parseCollectRequest, toRows } from "@rawtree/analytics/protocol";
-import { insertRows, type RawTreeIngestConfig } from "./rawtree.ts";
+import { insertRows, loadRawTreeConfig, type RawTreeConfig } from "./rawtree.ts";
 
 export type CollectorConfig = {
-  rawtree: RawTreeIngestConfig;
+  rawtree: RawTreeConfig;
   /** Exact origins (scheme://host[:port]) allowed to send browser data, or "*". */
   allowedOrigins: readonly string[] | "*";
   /** When set, requests with `Authorization: Bearer <token>` are trusted server events. */
@@ -16,16 +16,11 @@ export type CollectorConfig = {
 };
 
 export function loadCollectorConfig(env: Record<string, string | undefined> = process.env): CollectorConfig {
-  const missing = ["RAWTREE_DATABASE", "RAWTREE_INGEST_KEY", "ANALYTICS_ALLOWED_ORIGINS"].filter((name) => !env[name]);
-  if (missing.length > 0) throw new Error(`Collector is missing configuration: ${missing.join(", ")}`);
-  const origins = (env.ANALYTICS_ALLOWED_ORIGINS ?? "").split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
+  const rawtree = loadRawTreeConfig("RAWTREE_INGEST_KEY", env);
+  if (!env.ANALYTICS_ALLOWED_ORIGINS) throw new Error("Missing configuration: ANALYTICS_ALLOWED_ORIGINS");
+  const origins = env.ANALYTICS_ALLOWED_ORIGINS.split(",").map((o) => o.trim().replace(/\/$/, "")).filter(Boolean);
   return {
-    rawtree: {
-      apiUrl: (env.RAWTREE_API_URL ?? "https://api.rawtree.com").replace(/\/$/, ""),
-      database: env.RAWTREE_DATABASE ?? "",
-      ingestKey: env.RAWTREE_INGEST_KEY ?? "",
-      tablePrefix: env.RAWTREE_TABLE_PREFIX ?? "",
-    },
+    rawtree,
     allowedOrigins: origins.includes("*") ? "*" : origins,
     serverToken: env.ANALYTICS_SERVER_TOKEN || undefined,
   };

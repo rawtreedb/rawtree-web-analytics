@@ -64,11 +64,16 @@ export function sanitizeRecordingEvent(
   event: RrwebEvent,
   options: { allowedQueryParams?: readonly string[]; maskAttributes?: readonly string[] } = {},
 ): RrwebEvent {
-  const masked = new Set((options.maskAttributes ?? DEFAULT_MASKED_ATTRIBUTES).map((a) => a.toLowerCase()));
+  return sanitize(event, options.allowedQueryParams ?? DEFAULT_ALLOWED_QUERY_PARAMS, maskedSet(options.maskAttributes));
+}
+
+const maskedSet = (names: readonly string[] = DEFAULT_MASKED_ATTRIBUTES) => new Set(names.map((a) => a.toLowerCase()));
+
+function sanitize(event: RrwebEvent, allowedQueryParams: readonly string[], masked: ReadonlySet<string>): RrwebEvent {
   const data = event.data as Record<string, unknown> | undefined;
   if (!data) return event;
   if (event.type === 4 && typeof data.href === "string") {
-    data.href = sanitizeUrl(data.href, options.allowedQueryParams ?? DEFAULT_ALLOWED_QUERY_PARAMS) ?? "";
+    data.href = sanitizeUrl(data.href, allowedQueryParams) ?? "";
   } else if (event.type === 2) {
     sanitizeNode(data.node as SerializedNode, masked);
   } else if (event.type === 3 && data.source === 0) {
@@ -88,6 +93,8 @@ export function sanitizeRecordingEvent(
 export function startRecording(analytics: Analytics, options: StartRecordingOptions = {}): () => void {
   const { allowedQueryParams, maskAttributes, maskAllText = true, ...recordOptions } = options;
   const { maskTextSelector, ...defaults } = RECORDING_DEFAULTS;
+  const allowed = allowedQueryParams ?? DEFAULT_ALLOWED_QUERY_PARAMS;
+  const masked = maskedSet(maskAttributes);
   let recordingId = analytics.recordingId;
   let awaitingSnapshot = false;
   let stopped = false;
@@ -110,7 +117,7 @@ export function startRecording(analytics: Analytics, options: StartRecordingOpti
       }
       if (awaitingSnapshot && event.type !== 4) return;
       awaitingSnapshot = false;
-      analytics.sendRecording(sanitizeRecordingEvent(event as unknown as RrwebEvent, { allowedQueryParams, maskAttributes }));
+      analytics.sendRecording(sanitize(event as unknown as RrwebEvent, allowed, masked));
     },
   });
   return () => {

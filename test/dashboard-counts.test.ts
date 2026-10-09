@@ -1,98 +1,77 @@
 // Deduplicated counting. Delivery is at least once, so a resent event can store the
 // same `event_id` twice: every counting query must deduplicate in SQL (uniqExact on the
-// event, session, page view, or chunk ID), never count rows. These tests pin that contract plus the row parsing
-// shared with the pages. The live numbers were also verified against a hand count.
+// event, session, page view, or chunk ID), never count rows. These tests pin that contract
+// for every dashboard query in lib/queries.ts, plus the row coercion shared with the pages.
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  botPathsSql,
-  botSplitSql,
-  ctaClicksSql,
-  dailyTrendSql,
-  extractRecordings,
-  extractSummary,
-  extractTopPages,
-  isBotUa,
-  overviewSummarySql,
-  recordingsListSql,
-  recordingSummarySql,
-  resolveRange,
-  scrollDepthSql,
-  sessionFirstTouchSql,
-  timeOnPageSql,
-  timeOnPageTotalsSql,
-  topPagesSql,
-  uaBreakdownSql,
-  type QueryConfig,
-} from "../lib/dashboard.ts";
-import { isCrawler } from "../lib/crawlers.ts";
-
-const config: QueryConfig = {
-  apiUrl: "https://api.rawtree.test",
-  database: "web_analytics",
-  queryKey: "rt_query",
-  tablePrefix: "",
-};
+import { toRecording } from "../lib/dashboard.ts";
+import { campaigns, EVENT_QUERIES, recordingList, recordingSummary, topPages, type Scope } from "../lib/queries.ts";
+import { resolveRange } from "../lib/range.ts";
+import { runQuery } from "../lib/rawtree.ts";
+import { isBotUa, isCrawler } from "../lib/crawlers.ts";
 
 describe("counting SQL deduplicates", () => {
-  const range = { fromMs: 0, toMs: 1 };
+  const all: Scope = { table: "events", fromMs: 0, toMs: 1 };
+  // A young table without user agents or referrers: the queries must still deduplicate.
+  const young: Scope = { ...all, columns: new Set(["event_id", "event_name", "occurred_at_ms", "session_id", "anonymous_id", "page_url", "page_path"]) };
   const rowCount = /[^_a-zA-Z]count\(\)/;
 
-  it("counts events by unique event ID, never by rows", () => {
-    for (const sql of [
-      overviewSummarySql(config, range),
-      topPagesSql(config, range),
-      topPagesSql(config, range, 10, false),
-      dailyTrendSql(config, range),
-      dailyTrendSql(config, range, false),
-      uaBreakdownSql(config, range),
-      botPathsSql(config, range),
-      ctaClicksSql(config, range),
-    ]) {
-      assert.ok(sql.includes("uniqExact(toString(event_id))"), `must count uniqExact(event_id):\n${sql}`);
-      assert.ok(!rowCount.test(sql), `must never count rows instead of IDs:\n${sql}`);
+  it("counts with uniqExact on IDs in every dashboard query, never by rows", () => {
+    for (const scope of [all, young]) {
+      for (const [name, query] of Object.entries(EVENT_QUERIES)) {
+        const sql = query(scope);
+        assert.ok(sql.includes("uniqExact"), `${name} must count unique IDs:\n${sql}`);
+        assert.ok(!rowCount.test(sql), `${name} must never count rows instead of IDs:\n${sql}`);
+        assert.ok(!/[^_a-zA-Z]countIf\(toString\(event_id\)/.test(sql), `${name} must not countIf events:\n${sql}`);
+      }
     }
   });
 
   it("splits humans from bots with deduplicated conditional counts", () => {
-    // The bot split feeds every human metric and the bot totals (all minus human), so a
-    // plain countIf here would let one resent bot event inflate both sides.
-    const sql = botSplitSql(config, range);
-    assert.ok(sql.includes("uniqExactIf(toString(event_id), NOT match("), sql);
-    assert.ok(sql.includes("uniqExactIf(toString(event_id), toString(event_name) = 'page_view' AND NOT match("), sql);
-    assert.ok(sql.includes("uniqExactIf(toString(session_id), toString(session_id) != '' AND NOT match("), sql);
-    assert.ok(sql.includes("uniqExactIf(toString(anonymous_id), toString(anonymous_id) != '' AND NOT match("), sql);
-    assert.ok(!rowCount.test(sql) && !/countIf\(/.test(sql), sql);
+    for (const sql of [EVENT_QUERIES.overview(all), EVENT_QUERIES.daily(all)]) {
+      assert.ok(sql.includes("uniqExactIf(toString(event_id), NOT isBot) AS events"), sql);
+      assert.ok(sql.includes("uniqExactIf(toString(event_id), isBot) AS botEvents"), sql);
+      assert.ok(sql.includes("toString(session_id) != '' AND NOT isBot) AS sessions"), sql);
+    }
+  });
+
+  it("reads missing optional columns as NULL", () => {
+    const sql = EVENT_QUERIES.overview(young);
+    assert.ok(sql.includes("CAST(NULL AS Dynamic) AS `user_agent`"), sql);
+    assert.ok(!sql.includes("AS `session_id`"), "existing columns are read as stored");
+    assert.ok(!EVENT_QUERIES.overview(all).includes("CAST(NULL"), "no padding when every column exists");
   });
 
   it("attributes each session once, from its earliest event", () => {
-    for (const sql of [sessionFirstTouchSql(config, range), sessionFirstTouchSql(config, range, 10, false)]) {
-      assert.ok(/GROUP BY session_id/.test(sql), sql);
-      assert.ok(sql.includes("argMin(coalesce(toString(referrer), ''), CAST(occurred_at_ms AS Int64))"), sql);
-    }
-    assert.ok(sessionFirstTouchSql(config, range).includes("AND NOT match("), "human-only by default");
+    const sql = campaigns(all);
+    assert.ok(/GROUP BY sessionId/.test(sql), sql);
+    assert.ok(sql.includes("argMin(coalesce(toString(referrer), ''), CAST(occurred_at_ms AS Int64))"), sql);
+    assert.ok(sql.includes("uniqExact(sessionId) AS sessions"), sql);
   });
 
   it("deduplicates engagement page views by page_view_id before aggregating", () => {
-    for (const sql of [timeOnPageSql(config, range), timeOnPageTotalsSql(config, range), scrollDepthSql(config, range)]) {
+    const { timeOnPage, timeOnPageTotals, scrollDepth, scrollDepthTotals } = EVENT_QUERIES;
+    for (const sql of [timeOnPage(all), timeOnPageTotals(all), scrollDepth(all), scrollDepthTotals(all)]) {
       assert.ok(sql.includes("toString(properties.page_view_id) AS pv"), `must dedup by page_view_id:\n${sql}`);
       assert.ok(/GROUP BY pv/.test(sql), `must collapse duplicate rows per page view:\n${sql}`);
     }
   });
 
-  it("counts top pages from page_view events only, over the requested range", () => {
-    const sql = topPagesSql(config, { fromMs: 1000, toMs: 2000 });
+  it("counts top pages from human page_view events only, over the requested range", () => {
+    const sql = topPages({ table: "events", fromMs: 1000, toMs: 2000 });
     assert.ok(sql.includes("toString(event_name) = 'page_view'"));
+    assert.ok(sql.includes("NOT match(lower(coalesce(toString(user_agent), ''))"));
     assert.ok(sql.includes("CAST(occurred_at_ms AS Int64) >= 1000"));
     assert.ok(sql.includes("CAST(occurred_at_ms AS Int64) < 2000"));
   });
 
   it("deduplicates recording parts by chunk id, not by raw rows", () => {
-    for (const sql of [recordingsListSql(config), recordingSummarySql(config, "rec-1")]) {
+    for (const sql of [recordingList("recordings"), recordingSummary("recordings", "rec-1")]) {
       assert.ok(sql.includes("uniqExact(toString(chunk_id))"), `must deduplicate parts by chunk_id:\n${sql}`);
       assert.ok(!sql.includes("payload"), `must not read payloads:\n${sql}`);
     }
+    assert.ok(recordingList("recordings").includes("IN (SELECT toString(recording_id) AS recordingId"), "aggregates only the newest recordings");
   });
 });
 
@@ -143,35 +122,37 @@ describe("human/bot line", () => {
   });
 });
 
-describe("row extraction", () => {
-  it("parses summary rows from Dynamic columns, numbers or strings", () => {
-    assert.deepEqual(extractSummary({ events: "7", sessions: 3, visitors: "2", page_views: "4" }), { events: 7, sessions: 3, visitors: 2, pageViews: 4 });
-    assert.deepEqual(extractSummary(undefined), { events: 0, sessions: 0, visitors: 0, pageViews: 0 });
-  });
+describe("row coercion", () => {
+  const respond = (meta: { name: string; type: string }[], data: Record<string, unknown>[]) =>
+    (async () => new Response(JSON.stringify({ meta, data }))) as unknown as typeof fetch;
+  const config = { apiUrl: "https://api.rawtree.test", database: "web_analytics", key: "rt_query", tablePrefix: "" };
 
-  it("maps top page rows", () => {
-    assert.deepEqual(
-      extractTopPages([{ path: "/pricing", page_views: "9", visitors: "4" }]),
-      [{ path: "/pricing", pageViews: 9, visitors: 4 }],
+  it("types values by column type, so numeric-looking IDs stay strings", async () => {
+    const fetchImpl = respond(
+      [{ name: "events", type: "UInt64" }, { name: "ctaId", type: "String" }, { name: "medianMs", type: "Float64" }, { name: "has_meta", type: "Bool" }],
+      [{ events: "7", ctaId: "123", medianMs: null, has_meta: true }],
     );
+    assert.deepEqual(await runQuery(config, "SELECT 1", fetchImpl), [{ events: 7, ctaId: "123", medianMs: 0, has_meta: true }]);
   });
 });
 
 describe("recording completeness", () => {
   const base = {
-    start_ms: 1000,
-    end_ms: 2000,
-    last_received_ms: 500,
-    min_seq: 0,
-    max_seq: 2,
+    recordingId: "rec",
+    sessionId: "ses",
+    startMs: 1000,
+    endMs: 2000,
+    lastReceivedMs: 500,
+    minSeq: 0,
+    maxSeq: 2,
     chunks: 3,
-    unique_parts: 4,
-    declared_parts: 4,
-    total_bytes: 1234,
+    uniqueParts: 4,
+    declaredParts: 4,
+    bytes: 1234,
   };
 
   it("marks a recording complete when chunks run from 0 and every declared part is stored once", () => {
-    const [recording] = extractRecordings([{ ...base, recording_id: "rec", session_id: "ses" }]);
+    const recording = toRecording(base);
     assert.equal(recording.complete, true);
     assert.equal(recording.arriving, false);
     assert.equal(recording.chunks, 3);
@@ -181,29 +162,20 @@ describe("recording completeness", () => {
     // RawTree can store the same part twice (a resent batch). The SQL counts distinct
     // chunk_ids, so 4 unique parts of 5 declared stay incomplete even though 5 rows
     // (one of them a duplicate) are stored.
-    const [missing] = extractRecordings([{ ...base, unique_parts: 4, declared_parts: 5 }]);
-    assert.equal(missing.complete, false);
+    assert.equal(toRecording({ ...base, uniqueParts: 4, declaredParts: 5 }).complete, false);
   });
 
   it("reports a recording with a missing chunk or without chunk 0 as incomplete", () => {
-    const [missingMiddle] = extractRecordings([{ ...base, max_seq: 3, chunks: 3 }]);
-    assert.equal(missingMiddle.complete, false);
-    const [noStart] = extractRecordings([{ ...base, min_seq: 1, max_seq: 2, chunks: 2 }]);
-    assert.equal(noStart.complete, false);
+    assert.equal(toRecording({ ...base, maxSeq: 3, chunks: 3 }).complete, false);
+    assert.equal(toRecording({ ...base, minSeq: 1, maxSeq: 2, chunks: 2 }).complete, false);
   });
 
   it("labels a very recent incomplete recording as still arriving", () => {
     const now = 1_000_000;
-    const [arriving] = extractRecordings(
-      [{ ...base, unique_parts: 3, declared_parts: 4, last_received_ms: now - 5_000 }],
-      now,
-    );
+    const arriving = toRecording({ ...base, uniqueParts: 3, declaredParts: 4, lastReceivedMs: now - 5_000 }, now);
     assert.equal(arriving.complete, false);
     assert.equal(arriving.arriving, true);
-    const [stale] = extractRecordings(
-      [{ ...base, unique_parts: 3, declared_parts: 4, last_received_ms: now - 10 * 60_000 }],
-      now,
-    );
+    const stale = toRecording({ ...base, uniqueParts: 3, declaredParts: 4, lastReceivedMs: now - 10 * 60_000 }, now);
     assert.equal(stale.arriving, false);
   });
 });

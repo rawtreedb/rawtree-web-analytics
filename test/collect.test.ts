@@ -5,7 +5,7 @@ import { type CollectorConfig, handleCollect, handleCollectOptions, loadCollecto
 const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
 const ORIGIN = "https://shop.example";
 const config: CollectorConfig = {
-  rawtree: { apiUrl: "https://rawtree.test", database: "web_analytics", ingestKey: "rt_ingest", tablePrefix: "" },
+  rawtree: { apiUrl: "https://rawtree.test", database: "web_analytics", key: "rt_ingest", tablePrefix: "" },
   allowedOrigins: [ORIGIN],
   serverToken: "server-secret",
 };

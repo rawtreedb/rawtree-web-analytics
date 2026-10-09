@@ -1,26 +1,11 @@
 // The dashboard: Overview, Traffic, Acquisition, Content, Engagement, and Bots for one
 // date range, compared with the previous period of equal length. Layout and cards follow
-// Treewatcher's growth dashboard. All SQL lives in lib/dashboard.ts (getDashboard);
-// this page only folds rows for display. Every count is deduplicated by ID in SQL.
+// Treewatcher's growth dashboard. All SQL lives in lib/queries.ts (run by getDashboard);
+// this page only shapes rows for display. Every count is deduplicated by ID in SQL.
 
-import {
-  DashboardQueryError,
-  campaignRows,
-  getDashboard,
-  isBotUa,
-  loadQueryConfig,
-  previousRange,
-  resolveRange,
-  sessionsByChannel,
-  sessionsByReferrer,
-  type BaseTotals,
-  type BotSplit,
-  type DashboardData,
-  type ResolvedRange,
-  type SearchParamsLike,
-  type TrendRow,
-} from "../lib/dashboard.ts";
+import { getDashboard, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../lib/dashboard.ts";
 import { summarizeCrawlers } from "../lib/crawlers.ts";
+import { DAY_MS, previousRange, resolveRange, toUtcDay, type ResolvedRange, type SearchParams } from "../lib/range.ts";
 import { formatValue, ratio, relativeChange } from "../lib/format.ts";
 import { DateFilter } from "../components/date/date-filter.tsx";
 import { DataTableCard, DonutChart, MetricChartCard, StatCard, type ChartRow } from "../components/charts.tsx";
@@ -34,7 +19,6 @@ import {
   ErrorCard,
   GridItem,
   PageToolbar,
-  SegmentedLinks,
   StatGrid,
   chartColors,
   crawlerCategoryColors,
@@ -42,56 +26,48 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const DAY_MS = 86_400_000;
-const number = new Intl.NumberFormat("en");
-const dayOf = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const instant = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 const formatWindow = ({ fromMs, toMs }: { fromMs: number; toMs: number }) => `${instant.format(fromMs)} – ${instant.format(toMs)} UTC`;
+const pointChange = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
+const pagesPerSession = (totals: Totals) => ratio(totals.pageViews, totals.sessions);
+// Bots are counted in page requests, like Treewatcher: page_view events from bot user agents.
+const botShare = (totals: Totals) => ratio(totals.botPageViews, totals.botPageViews + totals.pageViews);
+const botsPerHuman = (totals: Totals) => ratio(totals.botPageViews, totals.pageViews);
+
+/** Headline totals: humans only, or all traffic while no user agent is stored. */
+function shownTotals(totals: Totals, hasUserAgent: boolean): Totals {
+  if (hasUserAgent) return totals;
+  return { ...totals, events: totals.allEvents, pageViews: totals.allPageViews, sessions: totals.allSessions, visitors: totals.allVisitors };
+}
 
 // --- Folding ------------------------------------------------------------------------
 
-/** Human totals when user agents exist, otherwise all traffic. */
-function humanTotals(totals: BaseTotals, split: BotSplit | null): BaseTotals {
-  return split
-    ? { events: split.humanEvents, sessions: split.humanSessions, visitors: split.humanVisitors, pageViews: split.humanPageViews }
-    : totals;
-}
+const DAILY_KEYS = ["pageViews", "sessions", "visitors", "events", "botEvents", "botPageViews"] as const;
 
 /**
  * Continuous UTC days for the window, zero-filled, with day N of the previous period
- * on the same row so the dashed comparison line lines up.
+ * on the same row (as previousPageViews, previousSessions, ...) so the dashed comparison line lines up.
  */
-function dailyRows(range: ResolvedRange, current: TrendRow[], previous: TrendRow[]): ChartRow[] {
+function dailyRows(range: ResolvedRange, current: DayRow[], previous: DayRow[]): ChartRow[] {
   const start = Math.floor(range.fromMs / DAY_MS) * DAY_MS;
   const previousStart = Math.floor(previousRange(range).fromMs / DAY_MS) * DAY_MS;
   const days = Math.max(1, Math.ceil((range.toMs - start) / DAY_MS));
-  const byDay = (rows: TrendRow[]) => new Map(rows.map((row) => [row.dayMs, row]));
-  const currentByDay = byDay(current);
-  const previousByDay = byDay(previous);
+  const currentByDay = new Map(current.map((row) => [row.dayMs, row]));
+  const previousByDay = new Map(previous.map((row) => [row.dayMs, row]));
   return Array.from({ length: days }, (_, index) => {
     const now = currentByDay.get(start + index * DAY_MS);
     const before = previousByDay.get(previousStart + index * DAY_MS);
-    return {
-      day: dayOf(start + index * DAY_MS),
-      previousDay: dayOf(previousStart + index * DAY_MS),
-      pageViews: now?.pageViews ?? 0,
-      previousPageViews: before?.pageViews ?? 0,
-      sessions: now?.sessions ?? 0,
-      previousSessions: before?.sessions ?? 0,
-      visitors: now?.visitors ?? 0,
-      previousVisitors: before?.visitors ?? 0,
-      events: now?.events ?? 0,
-      previousEvents: before?.events ?? 0,
-      botEvents: now?.botEvents ?? 0,
-      previousBotEvents: before?.botEvents ?? 0,
-      botRequests: now?.botPageViews ?? 0,
-      previousBotRequests: before?.botPageViews ?? 0,
-    };
+    const row: ChartRow = { day: toUtcDay(start + index * DAY_MS), previousDay: toUtcDay(previousStart + index * DAY_MS) };
+    for (const key of DAILY_KEYS) {
+      row[key] = now?.[key] ?? 0;
+      row[`previous${key[0]!.toUpperCase()}${key.slice(1)}`] = before?.[key] ?? 0;
+    }
+    return row;
   });
 }
 
 /** Paths grouped by their first segment ("/docs/a" → "/docs"). */
-function siteSections(pages: DashboardData["topPaths"]) {
+function siteSections(pages: DashboardData["current"]["topPages"]) {
   const counts = new Map<string, number>();
   for (const { path, pageViews } of pages) {
     const section = `/${path.split("/").filter(Boolean)[0] ?? ""}`;
@@ -103,31 +79,25 @@ function siteSections(pages: DashboardData["topPaths"]) {
 // --- Header ---------------------------------------------------------------------------
 
 function RangeFilter({ range }: { range: ResolvedRange }) {
-  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
   return (
     <DateFilter
-      maxDay={day(Date.now())}
+      maxDay={toUtcDay(Date.now())}
       preset={range.key === "custom" ? null : range.key}
-      range={{ from: day(range.fromMs), to: day(range.toMs - 1) }}
+      range={{ from: toUtcDay(range.fromMs), to: toUtcDay(range.toMs - 1) }}
     />
   );
 }
 
 // --- Page -------------------------------------------------------------------------------
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParamsLike> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const range = resolveRange(await searchParams);
   let data: DashboardData | undefined;
   let error: string | undefined;
   try {
-    data = await getDashboard(loadQueryConfig(), range);
+    data = await getDashboard(range);
   } catch (caught) {
-    if (caught instanceof DashboardQueryError) {
-      error = caught.message;
-    } else {
-      console.error("dashboard query failed", caught);
-      error = "Could not reach RawTree. Check the server logs and the RAWTREE_QUERY_KEY configuration.";
-    }
+    error = queryErrorMessage(caught);
   }
 
   return (
@@ -151,10 +121,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 }
 
 function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange }) {
-  const rows = dailyRows(range, data.daily, data.previousDaily);
-  const now = humanTotals(data.current, data.botSplit);
-  const before = humanTotals(data.previous, data.previousBotSplit);
-  const hasAgents = data.botSplit !== null;
+  const rows = dailyRows(range, data.current.daily, data.previous.daily);
+  const now = shownTotals(data.current.totals, data.hasUserAgent);
+  const before = shownTotals(data.previous.totals, data.hasUserAgent);
+  const hasAgents = data.hasUserAgent;
   const scope = hasAgents ? (
     <Badge variant="success">Humans only</Badge>
   ) : (
@@ -162,11 +132,8 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
       All traffic
     </Badge>
   );
-  const pagesPerSession = (totals: BaseTotals) => ratio(totals.pageViews, totals.sessions);
-  const botEvents = (totals: BaseTotals, split: BotSplit | null) => (split ? totals.events - split.humanEvents : 0);
-  const botShare = (totals: BaseTotals, split: BotSplit | null) => (split ? ratio(botEvents(totals, split), totals.events) : null);
-  const pointChange = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
-  const noEvents = data.current.events === 0;
+  const eventBotShare = (totals: Totals) => ratio(totals.botEvents, totals.allEvents);
+  const noEvents = now.allEvents === 0;
 
   return (
     <div className="grid gap-9">
@@ -215,7 +182,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
           />
           {hasAgents ? (
             <StatCard
-              change={pointChange(botShare(data.current, data.botSplit), botShare(data.previous, data.previousBotSplit))}
+              change={pointChange(eventBotShare(now), eventBotShare(before))}
               changeKind="points"
               format="percent"
               info="Bot events as a share of all events."
@@ -223,7 +190,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
               neutral
               trend={rows.map((row) => ratio(Number(row.botEvents), Number(row.botEvents) + Number(row.events)) ?? 0)}
               trendColor={chartColors.muted}
-              value={botShare(data.current, data.botSplit)}
+              value={eventBotShare(now)}
             />
           ) : null}
         </StatGrid>
@@ -271,7 +238,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
               initialSort={{ key: "day", direction: "desc" }}
               rows={rows}
               title="Daily breakdown"
-              totals={{ day: "Range", pageViews: now.pageViews, sessions: now.sessions, visitors: now.visitors, events: now.events, botEvents: botEvents(data.current, data.botSplit) }}
+              totals={{ day: "Range", pageViews: now.pageViews, sessions: now.sessions, visitors: now.visitors, events: now.events, botEvents: hasAgents ? now.botEvents : 0 }}
             />
           </GridItem>
         </DashboardGrid>
@@ -287,7 +254,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
 
 function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React.ReactNode }) {
   const description = "Where sessions come from, attributed to the referrer and UTM tags of each session's first event.";
-  if (data.firstTouch === null) {
+  if (!data.hasReferrer) {
     return (
       <DashboardSection description={description} id="acquisition" title="Acquisition">
         <CardEmpty>
@@ -297,10 +264,9 @@ function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React
       </DashboardSection>
     );
   }
-  const channels = sessionsByChannel(data.firstTouch).map(({ label, sessions }) => ({ label, value: sessions }));
-  const referrers = sessionsByReferrer(data.firstTouch);
-  const campaigns = campaignRows(data.firstTouch);
-  const sessions = data.firstTouch.length;
+  const channels = data.channels.map(({ channel, sessions }) => ({ label: channel, value: sessions }));
+  const sessions = channels.reduce((sum, { value }) => sum + value, 0);
+  const tagged = data.campaigns.reduce((sum, row) => sum + row.sessions, 0);
   return (
     <DashboardSection badges={scope} description={description} id="acquisition" title="Acquisition">
       <DashboardGrid>
@@ -323,7 +289,7 @@ function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React
             columns={{ label: "Referrer", details: ["Channel"], value: "Sessions", share: "Share" }}
             empty="No sessions in this range."
             info="The referrer host of each session's first event."
-            items={referrers.map(({ label, sessions, channel }) => ({ label, value: sessions, details: [channel] }))}
+            items={data.referrers.map(({ referrer, sessions, channel }) => ({ label: referrer, value: sessions, details: [channel] }))}
             limit={10}
             title="Referrers"
             total={sessions}
@@ -337,11 +303,11 @@ function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React
               { key: "campaign", header: "Campaign", format: "text" },
               { key: "sessions", header: "Sessions" },
             ]}
-            description={`${number.format(campaigns.reduce((sum, row) => sum + row.sessions, 0))} of ${number.format(sessions)} sessions carry UTM tags.`}
+            description={`${formatValue(tagged)} of ${formatValue(sessions)} sessions carry UTM tags.`}
             empty="No UTM-tagged sessions in this range."
             info="Sessions are attributed to the utm_source, utm_medium, and utm_campaign of their first page URL."
             initialSort={{ key: "sessions", direction: "desc" }}
-            rows={campaigns}
+            rows={data.campaigns}
             title="Campaigns"
           />
         </GridItem>
@@ -350,8 +316,9 @@ function AcquisitionSection({ data, scope }: { data: DashboardData; scope: React
   );
 }
 
-function ContentSection({ data, now, scope }: { data: DashboardData; now: BaseTotals; scope: React.ReactNode }) {
-  const previous = new Map(data.previousTopPaths.map((row) => [row.path, row.pageViews]));
+function ContentSection({ data, now, scope }: { data: DashboardData; now: Totals; scope: React.ReactNode }) {
+  const pages = data.current.topPages;
+  const previous = new Map(data.previous.topPages.map((row) => [row.path, row.pageViews]));
   return (
     <DashboardSection badges={scope} description="Page views by path, compared with the previous period." id="content" title="Content">
       <DashboardGrid>
@@ -360,10 +327,10 @@ function ContentSection({ data, now, scope }: { data: DashboardData; now: BaseTo
             columns={{ label: "Path", details: ["Visitors"], value: "Views", share: "Share", change: "Change" }}
             empty="No page views in this range."
             info="Share is of all page views in the range. Change is against the same path in the previous period."
-            items={data.topPaths.map((row) => ({
+            items={pages.map((row) => ({
               label: row.path,
               value: row.pageViews,
-              details: [number.format(row.visitors)],
+              details: [formatValue(row.visitors)],
               change: relativeChange(row.pageViews, previous.get(row.path) ?? null),
             }))}
             limit={10}
@@ -373,7 +340,7 @@ function ContentSection({ data, now, scope }: { data: DashboardData; now: BaseTo
         </GridItem>
         <GridItem lg={4} md={5}>
           <DashboardCard description="Page views grouped by first path segment." title="Site sections">
-            <DonutChart centerLabel="page views" items={siteSections(data.topPaths)} label="Page views by site section" />
+            <DonutChart centerLabel="page views" items={siteSections(pages)} label="Page views by site section" />
           </DashboardCard>
         </GridItem>
       </DashboardGrid>
@@ -384,28 +351,26 @@ function ContentSection({ data, now, scope }: { data: DashboardData; now: BaseTo
 function EngagementSection({ data }: { data: DashboardData }) {
   const description = "Time on page and scroll depth per page view (deduplicated by page_view_id), plus CTA clicks.";
   const totals = data.timeTotals;
-  const scrollViews = data.scroll.reduce((sum, row) => sum + row.views, 0);
-  if ((!totals || totals.views === 0) && scrollViews === 0 && data.ctas.length === 0) {
+  const views = totals.views;
+  const scrollViews = data.scrollTotals.views;
+  if (views === 0 && scrollViews === 0 && data.ctas.length === 0) {
     return (
       <DashboardSection description={description} id="engagement" title="Engagement">
         <CardEmpty>No time_on_page, scroll_depth, or cta_click events in this range.</CardEmpty>
       </DashboardSection>
     );
   }
-  const weighted = (key: "reached25" | "reached50" | "reached75" | "reached100") =>
-    scrollViews === 0 ? 0 : data.scroll.reduce((sum, row) => sum + row[key] * row.views, 0) / scrollViews;
   const scrollByPath = new Map(data.scroll.map((row) => [row.path, row]));
   const paths = [...new Set([...data.timeOnPage.map((row) => row.path), ...data.scroll.map((row) => row.path)])];
   const timeByPath = new Map(data.timeOnPage.map((row) => [row.path, row]));
-  const views = totals?.views ?? 0;
 
   return (
     <DashboardSection description={description} id="engagement" title="Engagement">
       <StatGrid>
-        <StatCard format="duration" info="Half of measured page views end sooner than this." label="Median time on page" value={views ? totals?.medianMs ?? null : null} />
-        <StatCard format="duration" info="A quarter of measured page views last longer than this." label="75th percentile time" value={views ? totals?.p75Ms ?? null : null} />
-        <StatCard format="percent" info="Share of measured page views lasting at least 10 seconds." label="Engaged views" value={ratio(totals?.engagedViews ?? 0, views)} />
-        <StatCard format="percent" info="Share of measured page views left within 5 seconds." label="Quick exits" value={ratio(totals?.quickExits ?? 0, views)} />
+        <StatCard format="duration" info="Half of measured page views end sooner than this." label="Median time on page" value={views ? totals.medianMs : null} />
+        <StatCard format="duration" info="A quarter of measured page views last longer than this." label="75th percentile time" value={views ? totals.p75Ms : null} />
+        <StatCard format="percent" info="Share of measured page views lasting at least 10 seconds." label="Engaged views" value={ratio(totals.engagedViews, views)} />
+        <StatCard format="percent" info="Share of measured page views left within 5 seconds." label="Quick exits" value={ratio(totals.quickExits, views)} />
         <StatCard info="Page views with a time_on_page event." label="Measured views" value={views} />
       </StatGrid>
       <DashboardGrid>
@@ -415,7 +380,7 @@ function EngagementSection({ data }: { data: DashboardData }) {
             empty="No scroll_depth events in this range."
             format="percent"
             info="Share of page views with a scroll_depth event that reached at least this far."
-            items={scrollViews ? (["25", "50", "75", "100"] as const).map((depth) => ({ label: `${depth}%`, value: weighted(`reached${depth}`) })) : []}
+            items={scrollViews ? (["25", "50", "75", "100"] as const).map((depth) => ({ label: `${depth}%`, value: data.scrollTotals[`reached${depth}`] })) : []}
             title="Scroll depth"
             total={1}
           />
@@ -469,7 +434,7 @@ function EngagementSection({ data }: { data: DashboardData }) {
 
 function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) {
   const description = "Crawlers, AI agents, and automated browsers, excluded from every human metric. Bots are identified from their user agent.";
-  if (data.botSplit === null) {
+  if (!data.hasUserAgent) {
     return (
       <DashboardSection description={description} id="bots" title="Bots">
         <CardEmpty>
@@ -479,52 +444,36 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
       </DashboardSection>
     );
   }
-  // Like Treewatcher, the unit is page requests: page_view events from bot user agents.
-  const botRequests = (totals: BaseTotals, split: BotSplit | null) => (split ? totals.pageViews - split.humanPageViews : null);
-  const botShare = (totals: BaseTotals, split: BotSplit | null) => {
-    const bots = botRequests(totals, split);
-    return bots === null || !split ? null : ratio(bots, bots + split.humanPageViews);
-  };
-  const botsPerHuman = (totals: BaseTotals, split: BotSplit | null) => {
-    const bots = botRequests(totals, split);
-    return bots === null || !split ? null : ratio(bots, split.humanPageViews);
-  };
-  const pointChange = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
-  const now = botRequests(data.current, data.botSplit) ?? 0;
-  const before = botRequests(data.previous, data.previousBotSplit);
-  const perHuman = botsPerHuman(data.current, data.botSplit);
-  const summary = data.uaGroups
-    ? summarizeCrawlers(
-        data.uaGroups.filter((group) => isBotUa(group.userAgent) && group.pageViews > 0).map((group) => ({ userAgent: group.userAgent, hits: group.pageViews })),
-      )
-    : null;
-  const ai = (summary?.categories ?? []).filter(({ label }) => label === "AI retrieval" || label === "AI training").reduce((sum, { hits }) => sum + hits, 0);
-  const percent = new Intl.NumberFormat("en", { style: "percent", maximumFractionDigits: 1 });
-  const paths = data.botPaths ?? [];
+  const current = data.current.totals;
+  const previous = data.previous.totals;
+  const now = current.botPageViews;
+  const perHuman = botsPerHuman(current);
+  const summary = summarizeCrawlers(data.botAgents);
+  const ai = summary.categories.filter(({ label }) => label === "AI retrieval" || label === "AI training").reduce((sum, { hits }) => sum + hits, 0);
 
   return (
     <DashboardSection badges={<Badge variant="info">bot page_view</Badge>} description={description} id="bots" title="Bots">
       <StatGrid>
         <StatCard
-          change={relativeChange(now, before)}
+          change={relativeChange(now, previous.botPageViews)}
           info="Distinct page_view events whose user agent matches the crawler pattern."
           label="Bot page requests"
           neutral
-          trend={rows.map((row) => Number(row.botRequests))}
+          trend={rows.map((row) => Number(row.botPageViews))}
           trendColor={chartColors.muted}
           value={now}
         />
         <StatCard
-          change={pointChange(botShare(data.current, data.botSplit), botShare(data.previous, data.previousBotSplit))}
+          change={pointChange(botShare(current), botShare(previous))}
           changeKind="points"
           format="percent"
           info="Bot page requests as a share of bot requests plus human page views."
           label="Bot share of page requests"
           neutral
-          value={botShare(data.current, data.botSplit)}
+          value={botShare(current)}
         />
         <StatCard
-          change={relativeChange(perHuman, botsPerHuman(data.previous, data.previousBotSplit))}
+          change={relativeChange(perHuman, botsPerHuman(previous))}
           format="ratio"
           hint={perHuman === null ? undefined : `${formatValue(perHuman, "decimal")} bot requests per human page view`}
           info="Human page views to bot page requests. Unavailable when there are no human page views."
@@ -533,16 +482,16 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
           value={perHuman}
         />
         <StatCard
-          hint={now ? `${percent.format(ai / now)} of bot requests` : undefined}
+          hint={now ? `${formatValue(ai / now, "percent")} of bot requests` : undefined}
           info="Requests from crawlers identified as AI retrieval (fetching pages for answers) or AI training (collecting corpora)."
           label="AI crawler requests"
           value={ai}
         />
         <StatCard
-          hint={summary?.crawlers[0] ? `Top: ${summary.crawlers[0].name}` : undefined}
+          hint={summary.crawlers[0] ? `Top: ${summary.crawlers[0].name}` : undefined}
           info="Distinct crawler names among the bot user agents in the range."
           label="Distinct crawlers"
-          value={summary?.crawlers.length ?? 0}
+          value={summary.crawlers.length}
         />
       </StatGrid>
       <DashboardGrid>
@@ -556,8 +505,8 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
                 label: "Bot requests",
                 neutral: true,
                 total: now,
-                previousTotal: before,
-                series: [{ key: "botRequests", label: "Bot page requests", color: chartColors.muted, comparisonKey: "previousBotRequests" }],
+                previousTotal: previous.botPageViews,
+                series: [{ key: "botPageViews", label: "Bot page requests", color: chartColors.muted, comparisonKey: "previousBotPageViews" }],
               },
             ]}
             title="Bot requests"
@@ -569,7 +518,7 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
             info="AI retrieval fetches pages to answer questions or power AI search. AI training collects corpora. Indexers feed search engines. Social bots unfurl shared links."
             title="Bot types"
           >
-            {summary?.categories.length ? (
+            {summary.categories.length ? (
               <DonutChart
                 centerLabel="requests"
                 items={summary.categories.map(({ label, hits }) => ({ label, value: hits, color: crawlerCategoryColors[label] }))}
@@ -587,7 +536,7 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
             columns={{ label: "Crawler", details: ["Type"], value: "Requests", share: "Share" }}
             empty="No bot requests in this range."
             info="Crawlers grouped from their user agents. Unknown bots keep their own bot, crawler, or spider token."
-            items={(summary?.crawlers ?? []).map((crawler) => ({
+            items={summary.crawlers.map((crawler) => ({
               label: crawler.name,
               value: crawler.hits,
               color: crawlerCategoryColors[crawler.category],
@@ -604,7 +553,7 @@ function BotsSection({ data, rows }: { data: DashboardData; rows: ChartRow[] }) 
             columns={{ label: "Path", value: "Requests", share: "Share" }}
             empty="No bot requests in this range."
             info="Paths of page_view events from bots."
-            items={paths.map(({ path, requests }) => ({ label: path, value: requests }))}
+            items={data.botPaths.map(({ path, requests }) => ({ label: path, value: requests }))}
             limit={10}
             title="Most crawled paths"
             total={now}

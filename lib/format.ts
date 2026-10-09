@@ -33,10 +33,6 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function formatCount(value: number): string {
-  return Number.isFinite(value) ? value.toLocaleString("en-US") : "—";
-}
-
 // Dashboard value formats, ported from Treewatcher (lib/format.ts).
 export type ValueFormat = "number" | "compact" | "percent" | "decimal" | "ratio" | "duration";
 

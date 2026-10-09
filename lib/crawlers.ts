@@ -2,8 +2,26 @@
 // (lib/crawlers.ts). Categories follow Birdwatcher's bot taxonomy (training,
 // retrieval, indexer, social), plus SEO tools and scripts/headless browsers.
 // The first matching rule wins, so specific tokens come before broader ones.
+// BOT_UA_PATTERN draws the human/bot line for the dashboard SQL (lib/queries.ts); the rules
+// below name and categorize the agents on the bot side. Keep both in step (tests check it).
 
-export const CRAWLER_CATEGORIES = ["AI retrieval", "AI training", "Search indexer", "Social preview", "SEO tool", "Script or headless", "Other"] as const;
+/**
+ * Broad crawler/user-agent pattern (lowercase) that splits human and bot traffic in SQL.
+ * Every human metric excludes user agents matching it; the Bots section counts them.
+ */
+export const BOT_UA_PATTERN =
+  "bot|crawl|spider|slurp|headless|puppeteer|playwright|phantom|curl/|wget|python|go-http|node-fetch|axios|undici|httpx|scrapy|" +
+  "facebookexternalhit|slack|whatsapp|chatgpt-user|perplexity|claude-|mistralai|cohere-ai|anthropic-ai|exa.ai|google-extended|" +
+  "googleother|google-inspectiontool|externalagent|meta-webindexer|bingpreview|yandex|sogou|ahrefs|semrush|barkrowler|screaming frog|aiohttp";
+
+const botUa = new RegExp(BOT_UA_PATTERN);
+
+/** The SQL human/bot line in JavaScript. */
+export function isBotUa(userAgent: string): boolean {
+  return botUa.test(userAgent.toLowerCase());
+}
+
+const CRAWLER_CATEGORIES = ["AI retrieval", "AI training", "Search indexer", "Social preview", "SEO tool", "Script or headless", "Other"] as const;
 export type CrawlerCategory = (typeof CRAWLER_CATEGORIES)[number];
 
 const rules: readonly [RegExp, string, CrawlerCategory][] = [
@@ -66,7 +84,7 @@ const rules: readonly [RegExp, string, CrawlerCategory][] = [
 ];
 
 /** Name and category for a user agent; unknown bots keep their own `*bot`/`*crawler`/`*spider` token. */
-export function classifyCrawler(userAgent: string): { name: string; category: CrawlerCategory } {
+function classifyCrawler(userAgent: string): { name: string; category: CrawlerCategory } {
   const ua = userAgent.toLowerCase();
   for (const [pattern, name, category] of rules) {
     if (pattern.test(ua)) return { name, category };

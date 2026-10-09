@@ -5,9 +5,10 @@
 
 import "rrweb/dist/style.css";
 import { IconPlayerPauseFilled, IconPlayerPlayFilled, IconRotate } from "@tabler/icons-react";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import type { eventWithTime, Replayer } from "rrweb";
-import { cn, segmentGroup, segmentItem } from "./ui.tsx";
+import { formatValue } from "../lib/format.ts";
+import { SegmentedControl, cn } from "./ui.tsx";
 
 type ReplayResponse = {
   recordingId: string;
@@ -17,31 +18,54 @@ type ReplayResponse = {
   segments: { startTimestamp: number; endTimestamp: number; events: unknown[] }[];
 };
 
-const SPEEDS = [1, 2, 4, 8] as const;
+const SPEEDS = [1, 2, 4, 8].map((speed) => ({ value: String(speed), label: `${speed}×` }));
 
 function clock(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** Pill-shaped playback speed picker (1×, 2×, 4×, 8×). */
-export function PlaybackSpeed({ value, onChange }: { value: number; onChange: (speed: number) => void }) {
+/** Clock and seek bar. Polls the replayer once per frame while playing, so only this re-renders. */
+function Timeline({ replayerRef, playing, total }: { replayerRef: RefObject<Replayer | undefined>; playing: boolean; total: number }) {
+  const [time, setTime] = useState(0);
+  useEffect(() => {
+    const read = () => {
+      const replayer = replayerRef.current;
+      if (replayer) setTime(Math.min(replayer.getCurrentTime(), replayer.getMetaData().totalTime));
+    };
+    read();
+    if (!playing) return;
+    let frame = requestAnimationFrame(function tick() {
+      read();
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [replayerRef, playing, total]);
+
+  const seek = (offset: number) => {
+    const replayer = replayerRef.current;
+    if (!replayer) return;
+    if (playing) replayer.play(offset);
+    else replayer.pause(offset);
+    setTime(offset);
+  };
+
   return (
-    <div aria-label="Playback speed" className={segmentGroup} role="radiogroup">
-      {SPEEDS.map((speed) => (
-        <button
-          aria-checked={speed === value}
-          className={cn(segmentItem, "numeric px-2.5")}
-          data-active={speed === value || undefined}
-          key={speed}
-          onClick={() => onChange(speed)}
-          role="radio"
-          type="button"
-        >
-          {speed}×
-        </button>
-      ))}
-    </div>
+    <>
+      <span className="numeric w-24 shrink-0 text-xs text-muted-foreground">
+        <span className="font-semibold text-foreground">{clock(time)}</span> / {clock(total)}
+      </span>
+      <input
+        aria-label="Seek"
+        className="h-1.5 min-w-40 flex-1 cursor-pointer accent-primary"
+        max={total}
+        min={0}
+        onChange={(event) => seek(Number(event.target.value))}
+        step={100}
+        type="range"
+        value={time}
+      />
+    </>
   );
 }
 
@@ -54,7 +78,6 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
   const [segmentIndex, setSegmentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
-  const [time, setTime] = useState(0);
   const [total, setTotal] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const replayerRef = useRef<Replayer | undefined>(undefined);
@@ -103,9 +126,6 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
       wrapper.style.top = `${(stage.clientHeight - viewport.height * scale) / 2}px`;
     };
     const observer = new ResizeObserver(fit);
-    const timer = setInterval(() => {
-      if (replayer) setTime(Math.min(replayer.getCurrentTime(), replayer.getMetaData().totalTime));
-    }, 100);
     void (async () => {
       try {
         const { Replayer: RrwebReplayer } = await import("rrweb");
@@ -120,7 +140,6 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
         replayer.on("finish", () => setPlaying(false));
         observer.observe(stage);
         setTotal(replayer.getMetaData().totalTime);
-        setTime(0);
         replayer.play(0);
         setPlaying(true);
       } catch (cause) {
@@ -130,7 +149,6 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
     })();
     return () => {
       disposed = true;
-      clearInterval(timer);
       observer.disconnect();
       replayerRef.current = undefined;
       replayer?.destroy();
@@ -152,17 +170,8 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
     setPlaying(true);
   };
 
-  const seek = (offset: number) => {
-    const replayer = replayerRef.current;
-    if (!replayer) return;
-    if (playing) replayer.play(offset);
-    else replayer.pause(offset);
-    setTime(offset);
-  };
-
   const restart = () => {
     replayerRef.current?.play(0);
-    setTime(0);
     setPlaying(true);
   };
 
@@ -213,41 +222,30 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
         <button aria-label="Restart" className={cn(iconButton, "border bg-card text-muted-foreground shadow-soft hover:text-foreground")} onClick={restart} type="button">
           <IconRotate />
         </button>
-        <span className="numeric w-24 shrink-0 text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{clock(time)}</span> / {clock(total)}
-        </span>
-        <input
-          aria-label="Seek"
-          className="h-1.5 min-w-40 flex-1 cursor-pointer accent-primary"
-          max={total}
-          min={0}
-          onChange={(event) => seek(Number(event.target.value))}
-          step={100}
-          type="range"
-          value={time}
+        <Timeline playing={playing} replayerRef={replayerRef} total={total} />
+        <SegmentedControl
+          itemClassName="numeric px-2.5"
+          items={SPEEDS}
+          label="Playback speed"
+          onValueChange={(value) => changeSpeed(Number(value))}
+          value={String(speed)}
         />
-        <PlaybackSpeed onChange={changeSpeed} value={speed} />
       </div>
 
       {data.segments.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           Complete stretches
-          <div aria-label="Replay segment" className={segmentGroup} role="radiogroup">
-            {data.segments.map((item, index) => (
-              <button
-                aria-checked={index === segmentIndex}
-                className={cn(segmentItem, "numeric")}
-                data-active={index === segmentIndex || undefined}
-                key={item.startTimestamp}
-                onClick={() => setSegmentIndex(index)}
-                role="radio"
-                title={`${item.events.length.toLocaleString("en-US")} events`}
-                type="button"
-              >
-                {index + 1} · {new Date(item.startTimestamp).toISOString().slice(11, 19)}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            itemClassName="numeric"
+            items={data.segments.map((item, index) => ({
+              value: String(index),
+              label: `${index + 1} · ${new Date(item.startTimestamp).toISOString().slice(11, 19)}`,
+              title: `${formatValue(item.events.length)} events`,
+            }))}
+            label="Replay segment"
+            onValueChange={(value) => setSegmentIndex(Number(value))}
+            value={String(segmentIndex)}
+          />
         </div>
       ) : null}
     </div>

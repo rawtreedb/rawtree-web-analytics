@@ -28,7 +28,8 @@ export type QueueOptions = {
 };
 
 const ENVELOPE_BYTES = 256;
-const RETRYABLE = (status: number) => status === 408 || status === 429 || status >= 500;
+/** HTTP statuses worth retrying; shared with the server entry. */
+export const RETRYABLE = (status: number) => status === 408 || status === 429 || status >= 500;
 
 export class BatchQueue {
   private items: Item[] = [];
@@ -137,24 +138,22 @@ export class BatchQueue {
   }
 
   private take(maxRequestBytes: number): Item[] {
-    const batch: Item[] = [];
     let bytes = ENVELOPE_BYTES;
     let events = 0;
     let parts = 0;
-    while (this.items.length > 0) {
-      const item = this.items[0];
+    let count = 0;
+    for (const item of this.items) {
       const full =
         bytes + item.bytes > maxRequestBytes ||
         (item.kind === "event" ? events >= LIMITS.maxEventsPerRequest : parts >= LIMITS.maxRecordingPartsPerRequest);
       if (full) break;
-      this.items.shift();
-      this.queuedBytes -= item.bytes;
       bytes += item.bytes;
       if (item.kind === "event") events++;
       else parts++;
-      batch.push(item);
+      count++;
     }
-    return batch;
+    this.queuedBytes -= bytes - ENVELOPE_BYTES;
+    return this.items.splice(0, count);
   }
 
   private putBack(batch: Item[], epoch: number): void {

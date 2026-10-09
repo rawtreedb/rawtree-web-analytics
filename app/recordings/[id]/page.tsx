@@ -3,18 +3,8 @@
 // /api/recordings/[id] in bounded parts.
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import {
-  DashboardQueryError,
-  extractRecordingSummary,
-  extractRecordings,
-  loadQueryConfig,
-  recordingSummarySql,
-  recordingsListSql,
-  runQuery,
-  type RecordingListItem,
-} from "../../../lib/dashboard.ts";
-import { formatBytes, formatDateTime, formatDuration } from "../../../lib/format.ts";
+import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../lib/dashboard.ts";
+import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../lib/format.ts";
 import { Badge, ErrorCard, PageToolbar, cn } from "../../../components/ui.tsx";
 import { RecordingPlayer } from "../../../components/recording-player.tsx";
 
@@ -67,23 +57,13 @@ function RecordingList({ recordings, selectedId }: { recordings: RecordingListIt
 
 export default async function RecordingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  let summary: ReturnType<typeof extractRecordingSummary>;
+  let summary: RecordingListItem | undefined;
   let recordings: RecordingListItem[] = [];
   let error: string | undefined;
   try {
-    const config = loadQueryConfig();
-    const [summaryRows, listRows] = await Promise.all([runQuery(config, recordingSummarySql(config, id)), runQuery(config, recordingsListSql(config))]);
-    summary = extractRecordingSummary(summaryRows[0]);
-    recordings = extractRecordings(listRows);
+    ({ recording: summary, recordings } = await getRecording(id));
   } catch (caught) {
-    if (caught instanceof DashboardQueryError) {
-      if (caught.status === 404) notFound();
-      error = caught.message;
-    } else {
-      console.error("recording query failed", caught);
-      error = "Could not reach RawTree. Check the server logs and the RAWTREE_QUERY_KEY configuration.";
-    }
-    summary = undefined;
+    error = queryErrorMessage(caught);
   }
 
   return (
@@ -107,7 +87,7 @@ export default async function RecordingPage({ params }: { params: Promise<{ id: 
                     <span>{formatDateTime(summary.startMs)}</span>
                     <span>{formatDuration(summary.endMs - summary.startMs)}</span>
                     <span>
-                      {summary.chunks.toLocaleString("en-US")} chunks · {formatBytes(summary.bytes)}
+                      {formatValue(summary.chunks)} chunks · {formatBytes(summary.bytes)}
                     </span>
                     <span>
                       Session <span className="font-mono">{summary.sessionId}</span>

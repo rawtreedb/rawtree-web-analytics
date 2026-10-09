@@ -2,18 +2,15 @@
 // chunk range (bounded in bytes), reassembled into replayable segments with the same
 // deduplication and gap rules as every reader.
 
-import { DashboardQueryError, getReplay, loadQueryConfig } from "../../../../lib/dashboard.ts";
+import { getReplay, queryErrorMessage } from "../../../../lib/dashboard.ts";
+import { RawTreeError } from "../../../../lib/rawtree.ts";
 
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }): Promise<Response> {
   const { id } = await ctx.params;
   try {
-    const replay = await getReplay(loadQueryConfig(), id);
-    return Response.json(replay);
+    return Response.json(await getReplay(id));
   } catch (error) {
-    if (error instanceof DashboardQueryError) {
-      return Response.json({ error: error.message }, { status: error.status });
-    }
-    console.error("replay query failed", error);
-    return Response.json({ error: "Could not reassemble this recording." }, { status: 503 });
+    const status = error instanceof RawTreeError ? error.status : 503;
+    return Response.json({ error: queryErrorMessage(error, "Could not reassemble this recording.") }, { status });
   }
 }

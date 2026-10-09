@@ -3,6 +3,7 @@
 // as source "server". Keep the token in server-side configuration only.
 
 import { type EventInput, parseCollectRequest, PROTOCOL_VERSION, type Properties } from "./protocol.ts";
+import { RETRYABLE } from "./queue.ts";
 import { SDK_VERSION, uuid } from "./util.ts";
 
 export type { Properties } from "./protocol.ts";
@@ -74,7 +75,7 @@ export function createServerAnalytics(options: ServerAnalyticsOptions): ServerAn
         } catch (error) {
           detail = error instanceof Error ? error.message : String(error);
         }
-        const retryable = status === 0 || status === 408 || status === 429 || status >= 500;
+        const retryable = status === 0 || RETRYABLE(status);
         if (!retryable || attempt >= maxRetries) {
           throw new Error(`Analytics collector ${status ? `returned HTTP ${status}` : "unreachable"}: ${detail}`);
         }

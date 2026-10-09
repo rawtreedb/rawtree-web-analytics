@@ -11,7 +11,7 @@
 
 import type { RecordingRow } from "@rawtree/analytics/protocol";
 
-export const RECORDING_FORMAT_VERSION = 1;
+const RECORDING_FORMAT_VERSION = 1;
 
 export const RRWEB_EVENT_TYPE = {
   DomContentLoaded: 0,
@@ -52,14 +52,17 @@ export type ChunkRow = Pick<
   | "payload"
 >;
 
-export type ChunkMetadata = Omit<ChunkRow, "payload">;
+type ChunkMetadata = Omit<ChunkRow, "payload">;
+
+/** The per-chunk columns planFetch reads. */
+export type ChunkPlanRow = Pick<ChunkMetadata, "chunk_seq" | "has_meta" | "has_full_snapshot" | "first_timestamp" | "last_timestamp" | "chunk_bytes">;
 
 export type RecordingGap =
   | { kind: "missing_chunks"; fromChunkSeq: number; toChunkSeq: number }
   | { kind: "missing_parts"; chunkSeq: number; missingParts: number[] }
   | { kind: "event_sequence"; afterEventSeq: number; nextEventSeq: number };
 
-export type ReplaySegment = {
+type ReplaySegment = {
   startChunkSeq: number;
   endChunkSeq: number;
   startTimestamp: number;
@@ -67,7 +70,7 @@ export type ReplaySegment = {
   events: RrwebEvent[];
 };
 
-export type ReassembledRecording = {
+type ReassembledRecording = {
   recordingId: string;
   duplicateRows: number;
   conflictingDuplicates: number;
@@ -195,7 +198,7 @@ export function reassemble(
   };
 }
 
-export type FetchPlan = {
+type FetchPlan = {
   firstChunkSeq: number;
   lastChunkSeq: number;
   plannedBytes: number;
@@ -208,10 +211,10 @@ export type FetchPlan = {
  * metadata must contain one deduplicated row per chunk part.
  */
 export function planFetch(
-  metadata: readonly ChunkMetadata[],
+  metadata: readonly ChunkPlanRow[],
   window: { fromTimestamp: number; toTimestamp: number; maxBytes: number },
 ): FetchPlan | undefined {
-  const chunks = new Map<number, ChunkMetadata>();
+  const chunks = new Map<number, ChunkPlanRow>();
   for (const row of metadata) if (!chunks.has(row.chunk_seq)) chunks.set(row.chunk_seq, row);
   const ordered = [...chunks.values()].sort((a, b) => a.chunk_seq - b.chunk_seq);
   const snapshotStarts = ordered.filter(
