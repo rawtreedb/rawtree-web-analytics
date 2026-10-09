@@ -33,3 +33,21 @@ export function sanitizeUrl(value: string | undefined, allowedQueryParams: reado
   for (const key of [...url.searchParams.keys()]) if (!allowedQueryParams.includes(key)) url.searchParams.delete(key);
   return url.toString().slice(0, 2048);
 }
+
+/** UTF-8 byte length of JSON.stringify(value) for a string value, without building the escaped copy. */
+export function jsonStringLength(value: string): number {
+  let bytes = 2;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (c === 0x22 || c === 0x5c || c === 0x08 || c === 0x09 || c === 0x0a || c === 0x0c || c === 0x0d) bytes += 2;
+    else if (c < 0x20) bytes += 6;
+    else if (c < 0x80) bytes += 1;
+    else if (c < 0x800) bytes += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < value.length && (value.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      bytes += 4;
+      i++;
+    } else if (c >= 0xd800 && c <= 0xdfff) bytes += 6; // lone surrogate: JSON.stringify writes \udxxx
+    else bytes += 3;
+  }
+  return bytes;
+}

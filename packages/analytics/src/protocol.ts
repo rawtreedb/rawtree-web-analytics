@@ -113,10 +113,20 @@ const ID = /^[A-Za-z0-9_:.\-]+$/;
 const EVENT_NAME = /^[A-Za-z0-9_.:\-/ ]+$/;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
 const MIN_TIMESTAMP = Date.UTC(2000, 0, 1);
-const encoder = new TextEncoder();
 
+/** UTF-8 byte length of a string, as TextEncoder would encode it (lone surrogates count as U+FFFD), without allocating. */
 export function utf8Length(value: string): number {
-  return encoder.encode(value).byteLength;
+  let bytes = 0;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if (c < 0x80) bytes += 1;
+    else if (c < 0x800) bytes += 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < value.length && (value.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      bytes += 4;
+      i++;
+    } else bytes += 3;
+  }
+  return bytes;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

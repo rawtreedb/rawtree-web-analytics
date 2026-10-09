@@ -3,6 +3,7 @@
 // Items keep their IDs across retries; the collector and readers deduplicate.
 
 import { type CollectRequest, type EventInput, LIMITS, PROTOCOL_VERSION, type RecordingPartInput, utf8Length } from "./protocol.ts";
+import { jsonStringLength } from "./util.ts";
 
 export type AnalyticsErrorCode = "invalid_event" | "queue_full" | "rejected" | "retries_exhausted";
 
@@ -60,7 +61,9 @@ export class BatchQueue {
   }
 
   enqueuePart(body: RecordingPartInput): void {
-    this.enqueue({ kind: "part", body, bytes: utf8Length(JSON.stringify(body)) + 1 });
+    // Same as utf8Length(JSON.stringify(body)) + 1, without re-escaping the large payload.
+    const bytes = utf8Length(JSON.stringify({ ...body, payload: "" })) - 2 + jsonStringLength(body.payload) + 1;
+    this.enqueue({ kind: "part", body, bytes });
   }
 
   private enqueue(item: Item): void {

@@ -11,21 +11,36 @@ export type RrwebEvent = { type: number; timestamp: number; [key: string]: unkno
 
 const META = 4;
 const FULL_SNAPSHOT = 2;
-const encoder = new TextEncoder();
-const decoder = new TextDecoder("utf-8", { fatal: true });
 
-/** Split UTF-8 text into parts of at most maxBytes without cutting a code point. */
+/**
+ * Split UTF-8 text into parts of at most maxBytes without cutting a code point.
+ * Walks code units instead of encoding and decoding the whole string. A lone surrogate
+ * (never present in JSON.stringify output) counts as the 3-byte U+FFFD it encodes to.
+ */
 export function splitUtf8(value: string, maxBytes: number): string[] {
   if (maxBytes < 4) throw new Error("maxBytes must allow a complete UTF-8 code point");
-  const bytes = encoder.encode(value);
   const parts: string[] = [];
   let start = 0;
-  while (start < bytes.length) {
-    let end = Math.min(start + maxBytes, bytes.length);
-    while (end < bytes.length && end > start && (bytes[end] & 0xc0) === 0x80) end--;
-    parts.push(decoder.decode(bytes.subarray(start, end)));
-    start = end;
+  let bytes = 0;
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    let size = 3;
+    let units = 1;
+    if (c < 0x80) size = 1;
+    else if (c < 0x800) size = 2;
+    else if (c >= 0xd800 && c <= 0xdbff && i + 1 < value.length && (value.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      size = 4;
+      units = 2;
+    }
+    if (bytes + size > maxBytes) {
+      parts.push(value.slice(start, i));
+      start = i;
+      bytes = 0;
+    }
+    bytes += size;
+    i += units - 1;
   }
+  if (start < value.length) parts.push(value.slice(start));
   return parts.length > 0 ? parts : [""];
 }
 
@@ -34,6 +49,8 @@ export class RecordingChunker {
   private readonly maxChunkBytes: number;
   private readonly maxPartPayloadBytes: number;
   private events: RrwebEvent[] = [];
+  /** JSON of each open event, kept from push so the chunk is serialized once. */
+  private json: string[] = [];
   private bytes = 2;
   private chunkStartSeq = 0;
   private nextEventSeq = 0;
@@ -51,7 +68,8 @@ export class RecordingChunker {
 
   /** Add one emitted rrweb event. Returns the parts of any chunk that closed. */
   push(event: RrwebEvent, sessionId: string): RecordingPartInput[] {
-    const eventBytes = utf8Length(JSON.stringify(event)) + 1;
+    const json = JSON.stringify(event);
+    const eventBytes = utf8Length(json) + 1;
     const last = this.events[this.events.length - 1];
     const continuesSnapshot = event.type === FULL_SNAPSHOT && last?.type === META;
     const closed: RecordingPartInput[] = [];
@@ -60,6 +78,7 @@ export class RecordingChunker {
     }
     if (this.events.length === 0) this.chunkStartSeq = this.nextEventSeq;
     this.events.push(event);
+    this.json.push(json);
     this.bytes += eventBytes;
     this.nextEventSeq++;
     // Close full chunks right away, but never between a Meta event and its snapshot.
@@ -71,7 +90,8 @@ export class RecordingChunker {
   flush(sessionId: string): RecordingPartInput[] {
     if (this.events.length === 0) return [];
     const events = this.events;
-    const payload = JSON.stringify(events);
+    // Equals JSON.stringify(events) byte for byte.
+    const payload = `[${this.json.join(",")}]`;
     const parts = splitUtf8(payload, this.maxPartPayloadBytes);
     const chunkSeq = this.nextChunkSeq++;
     const base = {
@@ -86,9 +106,10 @@ export class RecordingChunker {
       last_timestamp: Math.trunc(Math.max(...events.map((e) => e.timestamp))),
       has_meta: events.some((e) => e.type === META),
       has_full_snapshot: events.some((e) => e.type === FULL_SNAPSHOT),
-      chunk_bytes: utf8Length(payload),
+      chunk_bytes: this.bytes - 1, // "[" + "]" + each event plus its comma, minus the missing last comma
     };
     this.events = [];
+    this.json = [];
     this.bytes = 2;
     return parts.map((part, partIndex) => ({ ...base, part_index: partIndex, payload: part }));
   }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { LIMITS, parseCollectRequest, toRows } from "../src/protocol.ts";
+import { LIMITS, parseCollectRequest, toRows, utf8Length } from "../src/protocol.ts";
 import { SDK_VERSION } from "../src/util.ts";
 
 const NOW = Date.UTC(2026, 9, 7, 12, 0, 0);
@@ -31,6 +31,14 @@ function part(overrides: Record<string, unknown> = {}) {
 }
 
 const request = (body: Record<string, unknown>) => parseCollectRequest({ v: 1, sent_at: NOW, ...body }, NOW);
+
+describe("utf8Length", () => {
+  it("matches TextEncoder, including lone surrogates from untrusted JSON", () => {
+    for (const s of ["", "a", "ñ", "€", "😀", "\ud800", "x\udc00", "\udc00\ud800", "\ud800\ud800\udc00", "a€😀中\n"]) {
+      assert.equal(utf8Length(s), new TextEncoder().encode(s).length, JSON.stringify(s));
+    }
+  });
+});
 
 describe("parseCollectRequest", () => {
   it("accepts a valid mixed request and removes nulls and empty objects from properties", () => {

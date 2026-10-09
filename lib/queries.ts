@@ -8,7 +8,7 @@
 //   uniqExact(toString(event_id)) (or uniqExact on a session, page view, or chunk ID), never
 //   count() over raw rows.
 // - RawTree stores every column as Dynamic: wrap columns in toString() or CAST(... AS Int64).
-// - Human metrics exclude bots (IS_BOT); engagement counts every page view.
+// - Human metrics exclude bots (IS_BOT): every section except Bots counts people only.
 
 import { BOT_UA_PATTERN } from "./crawlers.ts";
 
@@ -173,13 +173,13 @@ LIMIT 50`;
 const ENGAGED_MS = 10_000;
 const QUICK_EXIT_MS = 5_000;
 
-/** One row per page view (deduplicated by page_view_id): pv, its path, and `measure` over its `event` rows. */
+/** One row per human page view (deduplicated by page_view_id): pv, its path, and `measure` over its `event` rows. */
 const perPageView = (s: Scope, event: string, measure: string) => `SELECT
     toString(properties.page_view_id) AS pv,
     argMax(coalesce(nullIf(toString(properties.path), ''), '(unknown)'), ${OCCURRED}) AS path,
     ${measure}
   FROM ${events(s)}
-  WHERE ${inWindow(s)} AND toString(event_name) = '${event}'
+  WHERE ${inWindow(s)} AND toString(event_name) = '${event}' AND NOT ${IS_BOT}
   GROUP BY pv`;
 
 const pageTimes = (s: Scope) => perPageView(s, "time_on_page", "max(CAST(properties.elapsed_ms AS Int64)) AS ms");
@@ -196,7 +196,7 @@ const SCROLL_STATS = `uniqExact(pv) AS views,
   round(avg(depth >= 75), 4) AS reached75,
   round(avg(depth >= 100), 4) AS reached100`;
 
-/** Engagement stat cards: views, medianMs, p75Ms, engagedViews, quickExits over every measured page view. */
+/** Engagement stat cards (humans only): views, medianMs, p75Ms, engagedViews, quickExits. */
 export const timeOnPageTotals = (s: Scope) => `SELECT ${TIME_STATS}
 FROM (${pageTimes(s)})`;
 
@@ -218,13 +218,13 @@ GROUP BY path
 ORDER BY views DESC, path ASC
 LIMIT 50`;
 
-/** CTA clicks list: ctaId, placement, clicks. */
+/** CTA clicks list (humans only): ctaId, placement, clicks. */
 export const ctaClicks = (s: Scope) => `SELECT
   toString(properties.cta_id) AS ctaId,
   toString(properties.placement) AS placement,
   uniqExact(toString(event_id)) AS clicks
 FROM ${events(s)}
-WHERE ${inWindow(s)} AND toString(event_name) = 'cta_click'
+WHERE ${inWindow(s)} AND toString(event_name) = 'cta_click' AND NOT ${IS_BOT}
 GROUP BY ctaId, placement
 ORDER BY clicks DESC, ctaId ASC
 LIMIT 10`;

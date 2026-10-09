@@ -246,7 +246,7 @@ function Dashboard({ data, range }: { data: DashboardData; range: ResolvedRange 
 
       <AcquisitionSection data={data} scope={scope} />
       <ContentSection data={data} now={now} scope={scope} />
-      <EngagementSection data={data} />
+      <EngagementSection data={data} scope={scope} />
       <BotsSection data={data} rows={rows} />
     </div>
   );
@@ -348,14 +348,14 @@ function ContentSection({ data, now, scope }: { data: DashboardData; now: Totals
   );
 }
 
-function EngagementSection({ data }: { data: DashboardData }) {
+function EngagementSection({ data, scope }: { data: DashboardData; scope: React.ReactNode }) {
   const description = "Time on page and scroll depth per page view (deduplicated by page_view_id), plus CTA clicks.";
   const totals = data.timeTotals;
   const views = totals.views;
   const scrollViews = data.scrollTotals.views;
   if (views === 0 && scrollViews === 0 && data.ctas.length === 0) {
     return (
-      <DashboardSection description={description} id="engagement" title="Engagement">
+      <DashboardSection badges={scope} description={description} id="engagement" title="Engagement">
         <CardEmpty>No time_on_page, scroll_depth, or cta_click events in this range.</CardEmpty>
       </DashboardSection>
     );
@@ -365,7 +365,7 @@ function EngagementSection({ data }: { data: DashboardData }) {
   const timeByPath = new Map(data.timeOnPage.map((row) => [row.path, row]));
 
   return (
-    <DashboardSection description={description} id="engagement" title="Engagement">
+    <DashboardSection badges={scope} description={description} id="engagement" title="Engagement">
       <StatGrid>
         <StatCard format="duration" info="Half of measured page views end sooner than this." label="Median time on page" value={views ? totals.medianMs : null} />
         <StatCard format="duration" info="A quarter of measured page views last longer than this." label="75th percentile time" value={views ? totals.p75Ms : null} />
