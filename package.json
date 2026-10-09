@@ -11,7 +11,7 @@
     "build": "npm run build -w @rawtree/analytics && next build",
     "start": "next start",
     "test": "npm run build -w @rawtree/analytics && npm test -w @rawtree/analytics && node --experimental-test-module-mocks --test 'test/**/*.test.ts'",
-    "typecheck": "npm run build -w @rawtree/analytics && tsc --noEmit"
+    "typecheck": "npm run build -w @rawtree/analytics && next typegen && tsc --noEmit"
   },
   "devDependencies": {
     "@fontsource-variable/geist": "^5.3.0",
