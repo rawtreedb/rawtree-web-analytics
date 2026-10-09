@@ -1,7 +1,12 @@
+// The test console page (/console): consent switches, browser and server events, simulated
+// bot and campaign traffic, a recording playground with privacy checks, and an event viewer
+// that follows each item from Queued to Sent (collector 200) to Stored (found in RawTree).
+// Everything goes through the real SDK to /api/console/collect with the visitor's credentials.
+"use client";
+
 import type { Properties } from "@rawtree/analytics";
 import {
   IconArrowRight,
-  IconBolt,
   IconBrowser,
   IconCheck,
   IconCloudUpload,
@@ -15,14 +20,11 @@ import {
   IconTargetArrow,
   IconX,
 } from "@tabler/icons-react";
-import { Fragment, type ReactNode, useState } from "react";
-import { Badge, type BadgeVariant } from "./components/ui/badge.tsx";
-import { Button } from "./components/ui/button.tsx";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card.tsx";
-import { Switch } from "./components/ui/switch.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table.tsx";
-import { InfoTooltip } from "./components/ui/tooltip.tsx";
+import { type ComponentProps, Fragment, type ReactNode, useEffect, useState } from "react";
+import { Button } from "../date/button.tsx";
+import { Badge, DashboardCard, InfoTip, PageToolbar, cn } from "../ui.tsx";
 import {
+  COLLECT_ENDPOINT,
   type Delivery,
   type Entry,
   findInSentRecordings,
@@ -33,15 +35,19 @@ import {
   sendServerEvent,
   setConsent,
   setMaskText,
+  startConsole,
+  stopConsole,
   type Storage,
   useConsole,
 } from "./console-store.ts";
+
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>["variant"]>;
 
 const pageViewId = crypto.randomUUID();
 const rand = (min: number, max: number) => Math.round(min + Math.random() * (max - min));
 const shortId = () => crypto.randomUUID().slice(0, 8);
 
-/** Recipe-shaped example events (see recipes/RECIPES.md). */
+/** Recipe-shaped example events (see examples/recipes/RECIPES.md). */
 const BROWSER_EVENTS: { name: string; props: () => Properties }[] = [
   { name: "page_view", props: () => ({ page_view_id: pageViewId, path: location.pathname, navigation: "initial" }) },
   { name: "cta_click", props: () => ({ cta_id: "pricing_start_trial", placement: "pricing_table" }) },
@@ -93,113 +99,132 @@ const SERVER_EVENTS: { name: string; props: Properties }[] = [
   { name: "export_completed", props: { format: "markdown" } },
 ];
 
-export function App() {
-  const { config, configError, identity } = useConsole();
+export function ConsoleApp({ database }: { database: string }) {
+  const { identity } = useConsole();
+  useEffect(() => {
+    startConsole();
+    return stopConsole;
+  }, []);
+  // With two columns (@5xl) the console fills the viewport (main's padding is p-4 lg:p-6):
+  // toolbar and consent stay put, the controls column and the event table scroll on their own.
   return (
-    // Desktop: header and consent bar stay fixed, the sidebar and the viewer scroll on their own.
-    <div className="flex min-h-screen flex-col lg:h-screen lg:overflow-hidden">
-      <header className="sticky top-0 z-20 shrink-0 border-b bg-background">
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 px-6 pt-4 pb-2">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <IconBolt className="size-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight">RawTree Web Analytics · Test console</h1>
-              <p className="text-xs text-muted-foreground">
-                {configError ? (
-                  <span className="text-destructive">Could not load /api/config: {configError}</span>
-                ) : (
-                  <>
-                    Collector <Mono data-testid="collector-url">{config?.collectorUrl ?? "…"}</Mono> · Database <Mono>{config?.database || "not set"}</Mono>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="ml-auto flex gap-2">
+    <div className="flex w-full flex-col @5xl:h-[calc(100dvh-3rem)]">
+      <PageToolbar
+        title="Console"
+        badges={<Badge variant="warning">Test events</Badge>}
+        meta={
+          <>
+            <span className="text-foreground">
+              A test console: everything you send from this page is synthetic data, written to your database and counted on the dashboard.
+            </span>
+          </>
+        }
+        filters={
+          <>
             <Button variant="outline" size="sm" onClick={() => void flush()} disabled={!identity}>
               <IconSend /> Flush now
             </Button>
             <Button variant="outline" size="sm" onClick={resetIdentity} disabled={!identity}>
               <IconRefresh /> Reset identity
             </Button>
+          </>
+        }
+      />
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <ConsentBar database={database} />
+        <div className="grid min-h-0 flex-1 gap-4 @5xl:grid-cols-[400px_minmax(0,1fr)]">
+          <div className="grid min-h-0 auto-rows-max content-start gap-4 @5xl:-mr-2 @5xl:overflow-y-auto @5xl:overscroll-contain @5xl:pr-2">
+            <BrowserEventsCard />
+            <ServerEventsCard />
+            <TrafficCard />
+            <PlaygroundCard />
           </div>
+          <EventViewer />
         </div>
-        <dl className="flex flex-wrap gap-x-6 gap-y-1 px-6 pb-3 text-xs">
-          <IdField label="anonymous_id" value={identity?.anonymousId} testId="anonymous-id" variant="info" />
-          <IdField label="session_id" value={identity?.sessionId} testId="session-id" variant="purple" />
-          <IdField label="recording_id" value={identity?.recordingId} testId="recording-id" variant="warning" />
-        </dl>
-      </header>
-      <ConsentBar />
-      <main className="grid min-h-0 flex-1 gap-5 px-6 py-5 lg:grid-cols-[400px_minmax(0,1fr)]">
-        <aside className="flex min-h-0 flex-col gap-5 lg:-mr-2 lg:overflow-y-auto lg:pr-2 lg:pb-1 [&>*]:shrink-0">
-          <BrowserEventsCard />
-          <ServerEventsCard />
-          <TrafficCard />
-          <PlaygroundCard />
-        </aside>
-        <EventViewer />
-      </main>
+      </div>
     </div>
   );
 }
 
-function Mono({ children, ...props }: { children: ReactNode; "data-testid"?: string }) {
-  return (
-    <span className="font-mono text-foreground" {...props}>
-      {children}
-    </span>
-  );
+function Mono({ children }: { children: ReactNode }) {
+  return <span className="font-mono text-foreground">{children}</span>;
 }
 
 function IdField({ label, value, testId, variant }: { label: string; value?: string; testId: string; variant: BadgeVariant }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd>
-        <Badge variant={value ? variant : "secondary"} className="font-mono font-normal" data-testid={testId}>
-          {value ?? "—"}
-        </Badge>
-      </dd>
-    </div>
+    <span className="flex min-w-0 max-w-full items-center gap-1.5">
+      {label}
+      <Badge variant={value ? variant : "secondary"} className="h-auto min-w-0 shrink font-mono font-normal break-all whitespace-normal" data-testid={testId}>
+        {value ?? "—"}
+      </Badge>
+    </span>
   );
 }
 
-function ConsentBar() {
-  const { consent, recording } = useConsole();
+/** On/off switch (native button, styles from rawtree-platform's switch). */
+function Switch({ checked, onCheckedChange, disabled, id }: { checked: boolean; onCheckedChange: (checked: boolean) => void; disabled?: boolean; id: string }) {
   return (
-    <section aria-label="Consent" className="shrink-0 border-b bg-background">
-      <div className="flex flex-wrap items-center gap-x-8 gap-y-3 px-6 py-3">
-        <div className="flex items-center gap-2 font-medium">
-          <IconShieldCheck className="size-4 text-primary" /> Consent
-          <span className="text-xs font-normal text-muted-foreground">Nothing is sent until analytics is allowed. Stored in localStorage.</span>
-        </div>
-        <label className="flex items-center gap-3">
-          <Switch id="consent-analytics" checked={consent.analytics} onCheckedChange={(on) => setConsent({ analytics: on, recording: on && consent.recording })} />
-          <span className="text-sm">Analytics</span>
-        </label>
-        <label className="flex items-center gap-3">
-          <Switch
-            id="consent-recording"
-            checked={consent.recording}
-            disabled={!consent.analytics}
-            onCheckedChange={(on) => setConsent({ analytics: consent.analytics, recording: on })}
-          />
-          <span className="text-sm">
-            Session recording <span className="text-muted-foreground">(requires analytics)</span>
-          </span>
-          {recording !== "off" && (
-            <Badge variant={recording === "on" ? "error" : "warning"} data-testid="recording-badge">
-              <IconPlayerRecord /> {recording === "on" ? "recording" : "loading recorder"}
-            </Badge>
-          )}
-        </label>
+    <button
+      aria-checked={checked}
+      className={cn(
+        "relative inline-flex h-[18.4px] w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        checked ? "bg-primary" : "border-border bg-muted-foreground/30",
+      )}
+      disabled={disabled}
+      id={id}
+      onClick={() => onCheckedChange(!checked)}
+      role="switch"
+      type="button"
+    >
+      <span className={cn("pointer-events-none block size-4 rounded-full bg-background transition-transform", checked && "translate-x-[calc(100%-2px)]")} />
+    </button>
+  );
+}
+
+const inputClass = "rounded-lg border bg-input px-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+const subhead = "eyebrow flex items-center gap-1.5";
+
+function ConsentBar({ database }: { database: string }) {
+  const { consent, recording, identity } = useConsole();
+  return (
+    <section aria-label="Consent" className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl bg-card px-5 py-3 text-sm shadow-soft ring-1 ring-foreground/10">
+      <div className="flex items-center gap-2 font-semibold">
+        <IconShieldCheck className="size-4 text-primary" /> Consent
+        <span className="text-xs font-normal text-muted-foreground">Nothing is sent until analytics is allowed. Stored in localStorage.</span>
+      </div>
+      <label className="flex items-center gap-3">
+        <Switch id="consent-analytics" checked={consent.analytics} onCheckedChange={(on) => setConsent({ analytics: on, recording: on && consent.recording })} />
+        Analytics
+      </label>
+      <label className="flex items-center gap-3">
+        <Switch id="consent-recording" checked={consent.recording} disabled={!consent.analytics} onCheckedChange={(on) => setConsent({ analytics: consent.analytics, recording: on })} />
+        <span>
+          Session recording <span className="text-muted-foreground">(requires analytics)</span>
+        </span>
+        {recording !== "off" && (
+          <Badge variant={recording === "on" ? "error" : "warning"} data-testid="recording-badge">
+            <IconPlayerRecord className="size-3" /> {recording === "on" ? "recording" : "loading recorder"}
+          </Badge>
+        )}
+      </label>
+      <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 border-t pt-2.5 text-xs text-muted-foreground">
+        <span>
+          Collector <Mono>{COLLECT_ENDPOINT}</Mono> · Database <Mono>{database}</Mono>
+        </span>
+        <IdField label="anonymous_id" value={identity?.anonymousId} testId="anonymous-id" variant="info" />
+        <IdField label="session_id" value={identity?.sessionId} testId="session-id" variant="purple" />
+        <IdField label="recording_id" value={identity?.recordingId} testId="recording-id" variant="warning" />
       </div>
     </section>
   );
 }
+
+const cardTitle = (icon: ReactNode, text: string) => (
+  <span className="flex items-center gap-2">
+    {icon}
+    {text}
+  </span>
+);
 
 function BrowserEventsCard() {
   const { consent } = useConsole();
@@ -221,14 +246,11 @@ function BrowserEventsCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconBrowser className="size-4 text-primary" /> Browser events
-        </CardTitle>
-        <CardDescription>{consent.analytics ? "Recipe-shaped events with example properties." : "Turn on analytics consent to send events."}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <DashboardCard
+      title={cardTitle(<IconBrowser className="size-4 text-primary" />, "Browser events")}
+      description={consent.analytics ? "Recipe-shaped events with example properties." : "Turn on analytics consent to send events."}
+    >
+      <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2">
           {BROWSER_EVENTS.map((event) => (
             <Button key={event.name} variant="secondary" size="sm" disabled={!consent.analytics} data-action={event.name} onClick={() => sendBrowserEvent(event.name, event.props())}>
@@ -237,17 +259,11 @@ function BrowserEventsCard() {
           ))}
         </div>
         <div className="flex flex-col gap-2 border-t pt-4">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Custom event</span>
-          <input
-            id="custom-name"
-            className="h-9 rounded-lg border bg-input px-3 font-mono text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            aria-label="Event name"
-          />
+          <span className={subhead}>Custom event</span>
+          <input id="custom-name" className={cn(inputClass, "h-9 font-mono text-sm")} value={name} onChange={(event) => setName(event.target.value)} aria-label="Event name" />
           <textarea
             id="custom-properties"
-            className="min-h-24 rounded-lg border bg-input px-3 py-2 font-mono text-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className={cn(inputClass, "min-h-24 py-2 font-mono text-xs")}
             value={json}
             onChange={(event) => setJson(event.target.value)}
             aria-label="Properties (JSON)"
@@ -261,31 +277,22 @@ function BrowserEventsCard() {
             <IconSend /> Send custom event
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </DashboardCard>
   );
 }
 
 function ServerEventsCard() {
-  const { config, lastServerEvent } = useConsole();
-  const enabled = config?.serverEvents === true;
+  const { lastServerEvent } = useConsole();
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconServer className="size-4 text-primary" /> Server events
-        </CardTitle>
-        <CardDescription>
-          {enabled ? (
-            "Sent by the console server with createServerAnalytics and a stable event ID."
-          ) : (
-            <span data-testid="server-hint">Set ANALYTICS_SERVER_TOKEN for the console server to enable server events.</span>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+    <DashboardCard
+      title={cardTitle(<IconServer className="size-4 text-primary" />, "Server events")}
+      description="Sent by this app's server with createServerAnalytics and a stable event ID."
+      info="Server events need no consent: they record outcomes your backend already knows. Resending with the same ID still counts once."
+    >
+      <div className="flex flex-wrap gap-2">
         {SERVER_EVENTS.map((event) => (
-          <Button key={event.name} variant="secondary" size="sm" disabled={!enabled} data-action={event.name} onClick={() => void sendServerEvent(event.name, event.props)}>
+          <Button key={event.name} variant="secondary" size="sm" data-action={event.name} onClick={() => void sendServerEvent(event.name, event.props)}>
             {event.name}
           </Button>
         ))}
@@ -293,30 +300,27 @@ function ServerEventsCard() {
           variant="outline"
           size="sm"
           id="server-resend"
-          disabled={!enabled || !lastServerEvent}
+          disabled={!lastServerEvent}
           onClick={() => lastServerEvent && void sendServerEvent(lastServerEvent.name, lastServerEvent.properties, lastServerEvent.eventId)}
         >
           <IconRepeat /> Resend last with same ID
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </DashboardCard>
   );
 }
 
 function TrafficCard() {
   const { consent } = useConsole();
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconRobot className="size-4 text-primary" /> Simulated traffic
-          <InfoTooltip>Each click is a new visitor (own anonymous_id and session_id) sending one page_view. Your own IDs are untouched.</InfoTooltip>
-        </CardTitle>
-        <CardDescription>{consent.analytics ? "Crawler visits and campaign visits for the dashboard." : "Turn on analytics consent to send events."}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+    <DashboardCard
+      title={cardTitle(<IconRobot className="size-4 text-primary" />, "Simulated traffic")}
+      info="Each click is a new visitor (own anonymous_id and session_id) sending one page_view. Your own IDs are untouched."
+      description={consent.analytics ? "Crawler visits and campaign visits for the dashboard." : "Turn on analytics consent to send events."}
+    >
+      <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Bots (user agent override)</span>
+          <span className={subhead}>Bots (user agent override)</span>
           <div className="flex flex-wrap gap-2">
             {BOTS.map((bot) => (
               <Button
@@ -334,7 +338,7 @@ function TrafficCard() {
           </div>
         </div>
         <div className="flex flex-col gap-2 border-t pt-4">
-          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <span className={subhead}>
             <IconTargetArrow className="size-3.5" /> Acquisition (referrer + UTM)
           </span>
           <div className="flex flex-wrap gap-2">
@@ -356,8 +360,8 @@ function TrafficCard() {
             ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </DashboardCard>
   );
 }
 
@@ -384,26 +388,18 @@ function PlaygroundCard() {
   // Page text is readable unless "Mask all text" is on, so the panel text is only a privacy check then.
   const panelSeen = open || recordingBytesSent > 0 ? found[SECRETS.panel] : undefined;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconPlayerRecord className="size-4 text-primary" /> Recording playground
-          <InfoTooltip>
-            Session recording captures the page structure and every change to it (plus clicks, scrolls, and typing), not video. Replay
-            rebuilds the page from that data.
-          </InfoTooltip>
-        </CardTitle>
-        <CardDescription>
-          {recording === "off" ? "Turn on session recording in the consent row first." : "Change the page and check what stays private."}
-        </CardDescription>
-        <CardAction>
-          <label className="flex items-center gap-2 text-xs">
-            <Switch id="mask-text" checked={maskText} onCheckedChange={setMaskText} />
-            Mask all text
-          </label>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+    <DashboardCard
+      title={cardTitle(<IconPlayerRecord className="size-4 text-primary" />, "Recording playground")}
+      info="Session recording captures the page structure and every change to it (plus clicks, scrolls, and typing), not video. Replay rebuilds the page from that data."
+      description={recording === "off" ? "Turn on session recording in the consent row first." : "Change the page and check what stays private."}
+      action={
+        <label className="flex items-center gap-2 text-xs">
+          <Switch id="mask-text" checked={maskText} onCheckedChange={setMaskText} />
+          Mask all text
+        </label>
+      }
+    >
+      <div className="flex flex-col gap-5">
         <Step3 title="1. Make the page change" tip="Each click adds or removes elements, which the recorder captures. New recording parts then appear in the event viewer.">
           <div className="flex gap-2">
             <Button id="add-item" variant="secondary" size="sm" onClick={() => setItems((list) => [...list, `Item ${list.length + 1}`])}>
@@ -427,13 +423,7 @@ function PlaygroundCard() {
 
         <Step3 title="2. Private content" tip="Each example below must never reach the stored recording. Step 3 checks it.">
           <Example label="Masked input" tip="Inputs are masked: whatever you type is recorded as ****.">
-            <input
-              id="masked-input"
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              className="h-9 w-full rounded-lg border bg-input px-3 text-sm outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              placeholder="Type something, e.g. your name"
-            />
+            <input id="masked-input" value={typed} onChange={(event) => setTyped(event.target.value)} className={cn(inputClass, "h-9 w-full text-sm")} placeholder="Type something, e.g. your name" />
           </Example>
           <Example label="Blocked region" tip="Elements with the class rr-block are not recorded at all; the replay shows an empty box of the same size. Use it for areas like billing details.">
             <div className="rr-block rounded-xl border border-dashed p-3 font-mono text-xs">
@@ -447,7 +437,7 @@ function PlaygroundCard() {
           </Example>
           <Example label="Email in an attribute" tip="rrweb does not mask attributes by itself, so the SDK masks any attribute value that contains an email address. The visible text uses rr-mask.">
             <span data-email={SECRETS.email} className="rr-mask font-mono text-xs text-muted-foreground">
-              {"<span data-email=\"jane.doe@example.com\">"}
+              {'<span data-email="jane.doe@example.com">'}
             </span>
           </Example>
         </Step3>
@@ -455,21 +445,21 @@ function PlaygroundCard() {
         <Step3
           title="3. Privacy check"
           tip="Searches the recording data the collector accepted for each private value. Page text is readable by default; turn on Mask all text and the panel text disappears too."
-          extra={<Badge variant="outline">{(recordingBytesSent / 1024).toFixed(1)} KB checked</Badge>}
+          extra={<Badge>{(recordingBytesSent / 1024).toFixed(1)} KB checked</Badge>}
         >
           <ul className="flex flex-col gap-1.5" data-testid="privacy-checks">
             {checks.map((check) => (
               <li key={check.label} className="flex items-center justify-between gap-3 text-xs">
                 <span>{check.label}</span>
                 {recordingBytesSent === 0 || check.leaked === undefined ? (
-                  <Badge variant="secondary">{recordingBytesSent === 0 ? "no recording data yet" : "type something first"}</Badge>
+                  <Badge>{recordingBytesSent === 0 ? "no recording data yet" : "type something first"}</Badge>
                 ) : check.leaked ? (
                   <Badge variant="error">
-                    <IconX /> found in recording
+                    <IconX className="size-3" /> found in recording
                   </Badge>
                 ) : (
                   <Badge variant="success">
-                    <IconCheck /> not in recording
+                    <IconCheck className="size-3" /> not in recording
                   </Badge>
                 )}
               </li>
@@ -477,7 +467,7 @@ function PlaygroundCard() {
             <li className="flex items-center justify-between gap-3 text-xs">
               <span>Panel text {maskText ? "(masked)" : "(readable)"}</span>
               {recordingBytesSent === 0 || panelSeen === undefined ? (
-                <Badge variant="secondary">{recordingBytesSent === 0 ? "no recording data yet" : "open the panel first"}</Badge>
+                <Badge>{recordingBytesSent === 0 ? "no recording data yet" : "open the panel first"}</Badge>
               ) : panelSeen ? (
                 <Badge variant={maskText ? "error" : "info"}>found in recording</Badge>
               ) : (
@@ -486,19 +476,19 @@ function PlaygroundCard() {
             </li>
           </ul>
         </Step3>
-      </CardContent>
-    </Card>
+      </div>
+    </DashboardCard>
   );
 }
 
 function Step3({ title, tip, extra, children }: { title: string; tip: string; extra?: ReactNode; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
-      <h3 className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <h4 className={subhead}>
         {title}
-        <InfoTooltip>{tip}</InfoTooltip>
+        <InfoTip>{tip}</InfoTip>
         {extra && <span className="ml-auto normal-case tracking-normal">{extra}</span>}
-      </h3>
+      </h4>
       {children}
     </section>
   );
@@ -509,7 +499,7 @@ function Example({ label, tip, children }: { label: string; tip: string; childre
     <div className="flex flex-col gap-1.5">
       <span className="flex items-center gap-1.5 text-xs font-medium">
         {label}
-        <InfoTooltip>{tip}</InfoTooltip>
+        <InfoTip>{tip}</InfoTip>
       </span>
       {children}
     </div>
@@ -519,7 +509,8 @@ function Example({ label, tip, children }: { label: string; tip: string; childre
 // ---------- event viewer ----------
 
 const time = (at: number) => new Date(at).toLocaleTimeString("en-GB", { hour12: false }) + `.${String(at % 1000).padStart(3, "0")}`;
-const short = (id?: string) => (!id ? "…" : id.length > 22 ? `${id.slice(0, 20)}…` : id);
+const short = (id?: string) => (!id ? "…" : id.length > 18 ? `${id.slice(0, 16)}…` : id);
+const cell = "px-2.5 py-2 align-middle whitespace-nowrap";
 
 function Step({ variant, children, col, state }: { variant: BadgeVariant; children: ReactNode; col: string; state: string }) {
   return (
@@ -551,8 +542,6 @@ function StoredStep({ storage, stored }: { storage: Storage; stored?: string }) 
       return <Step variant="success" col="stored" state="stored">Stored · {stored}</Step>;
     case "missing":
       return <Step variant="error" col="stored" state="missing">not found after 30 s{stored ? ` · ${stored}` : ""}</Step>;
-    case "unconfigured":
-      return <Step variant="outline" col="stored" state="unconfigured">storage check not configured</Step>;
   }
 }
 
@@ -563,44 +552,44 @@ function EntryCells({ entry }: { entry: Entry }) {
     const { code, message, dropped, status } = entry.error;
     return (
       <>
-        <TableCell className="font-medium text-destructive">SDK error</TableCell>
-        <TableCell><Badge variant="error">onError</Badge></TableCell>
-        <TableCell className="truncate font-mono text-xs" title={code}>{code}</TableCell>
-        <TableCell className="text-xs whitespace-normal text-muted-foreground">
+        <td className={cn(cell, "font-medium text-destructive")}>SDK error</td>
+        <td className={cell}><Badge variant="error">onError</Badge></td>
+        <td className={cn(cell, "truncate font-mono")} title={code}>{code}</td>
+        <td className={cn(cell, "whitespace-normal text-muted-foreground")}>
           {message} · dropped {dropped}
           {status ? ` · HTTP ${status}` : ""}
-        </TableCell>
+        </td>
       </>
     );
   }
   if (entry.kind === "recording") {
     return (
       <>
-        <TableCell className="font-medium">recording</TableCell>
-        <TableCell><Badge variant="purple">browser</Badge></TableCell>
-        <TableCell className="truncate font-mono text-xs" title={entry.id}>{short(entry.id)}</TableCell>
-        <TableCell>
+        <td className={cn(cell, "font-medium")}>recording</td>
+        <td className={cell}><Badge variant="purple">browser</Badge></td>
+        <td className={cn(cell, "truncate font-mono")} title={entry.id}>{short(entry.id)}</td>
+        <td className={cell}>
           <div className="flex flex-wrap items-center gap-1.5">
             <SentStep delivery={entry.delivery} label={`${entry.partsSent} parts sent`} />
             <Arrow />
             <StoredStep storage={entry.storage} stored={entry.partsStored !== undefined ? `${entry.partsStored} / ${entry.partsSent} parts` : undefined} />
           </div>
-        </TableCell>
+        </td>
       </>
     );
   }
   const rows = entry.storedRows === undefined ? undefined : `${entry.storedRows} row${entry.storedRows === 1 ? "" : "s"}`;
   return (
     <>
-      <TableCell className="truncate font-medium" title={entry.name}>
+      <td className={cn(cell, "truncate font-medium")} title={entry.name}>
         {entry.name}
-        {entry.sends > 1 && <span className="ml-1 text-xs text-muted-foreground">×{entry.sends}</span>}
-      </TableCell>
-      <TableCell>
+        {entry.sends > 1 && <span className="ml-1 text-muted-foreground">×{entry.sends}</span>}
+      </td>
+      <td className={cell}>
         <Badge variant={entry.source === "server" ? "warning" : "info"}>{entry.source}</Badge>
-      </TableCell>
-      <TableCell className="truncate font-mono text-xs" title={entry.id}>{short(entry.id)}</TableCell>
-      <TableCell>
+      </td>
+      <td className={cn(cell, "truncate font-mono")} title={entry.id}>{short(entry.id)}</td>
+      <td className={cell}>
         <div className="flex flex-wrap items-center gap-1.5">
           <Step variant="info" col="queued" state="queued">Queued</Step>
           <Arrow />
@@ -608,7 +597,7 @@ function EntryCells({ entry }: { entry: Entry }) {
           <Arrow />
           <StoredStep storage={entry.storage} stored={rows} />
         </div>
-      </TableCell>
+      </td>
     </>
   );
 }
@@ -617,71 +606,67 @@ function EventViewer() {
   const { entries } = useConsole();
   const [openKey, setOpenKey] = useState<string>();
   return (
-    <Card className="min-h-[600px] pb-0 lg:h-full lg:min-h-0">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <IconCloudUpload className="size-4 text-primary" /> Event viewer
-        </CardTitle>
-        <CardDescription>Newest first. Queued → Sent (collector 200) → Stored (found in RawTree). Click a row for the JSON as sent.</CardDescription>
-        <CardAction>
-          <Badge variant="outline">{entries.length} rows</Badge>
-        </CardAction>
-      </CardHeader>
+    <DashboardCard
+      className="max-@5xl:max-h-[80vh]"
+      title={cardTitle(<IconCloudUpload className="size-4 text-primary" />, "Event viewer")}
+      description="Newest first. Queued → Sent (collector 200) → Stored (found in RawTree). Click a row for the JSON as sent."
+      action={<Badge>{entries.length} rows</Badge>}
+    >
       {/* Fixed layout: column widths never depend on the rows. Status takes the remaining width,
           and below the minimum table width the viewer scrolls horizontally. */}
-      <Table className="table-fixed min-w-[960px]">
-        <colgroup>
-          <col className="w-[120px]" />
-          <col className="w-[190px]" />
-          <col className="w-[90px]" />
-          <col className="w-[200px]" />
-          <col />
-        </colgroup>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Time</TableHead>
-            <TableHead>Event</TableHead>
-            <TableHead>Source</TableHead>
-            <TableHead>ID</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {entries.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                No events yet. Allow analytics and press a button.
-              </TableCell>
-            </TableRow>
-          )}
-          {entries.map((entry) => {
-            const open = openKey === entry.key;
-            const json = entry.kind === "error" ? entry.error : entry.payload;
-            return (
-              <Fragment key={entry.key}>
-                <TableRow
-                  className="cursor-pointer"
-                  data-kind={entry.kind}
-                  data-id={entry.kind === "error" ? entry.error.code : entry.id}
-                  data-name={entry.kind === "event" ? entry.name : undefined}
-                  data-state={open ? "selected" : undefined}
-                  onClick={() => setOpenKey(open ? undefined : entry.key)}
-                >
-                  <TableCell className="font-mono text-xs text-muted-foreground">{time(entry.at)}</TableCell>
-                  <EntryCells entry={entry} />
-                </TableRow>
-                {open && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="bg-muted/40 whitespace-normal">
-                      <pre className="max-h-80 overflow-auto font-mono text-xs leading-relaxed">{JSON.stringify(json, null, 2)}</pre>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </Fragment>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </Card>
+      <div className="-mx-5 -mb-5 h-full overflow-auto overscroll-contain px-5 pb-5">
+        <table className="w-full min-w-[720px] table-fixed text-xs">
+          <colgroup>
+            <col className="w-[96px]" />
+            <col className="w-[150px]" />
+            <col className="w-[76px]" />
+            <col className="w-[150px]" />
+            <col />
+          </colgroup>
+          <thead>
+            <tr className="border-b">
+              {["Time", "Event", "Source", "ID", "Status"].map((header) => (
+                <th className="eyebrow sticky top-0 z-10 bg-card px-2.5 pb-1.5 text-left" key={header} scope="col">{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 && (
+              <tr>
+                <td colSpan={5} className="py-10 text-center text-muted-foreground">
+                  No events yet. Allow analytics and press a button.
+                </td>
+              </tr>
+            )}
+            {entries.map((entry) => {
+              const open = openKey === entry.key;
+              const json = entry.kind === "error" ? entry.error : entry.payload;
+              return (
+                <Fragment key={entry.key}>
+                  <tr
+                    className={cn("cursor-pointer border-b hover:bg-muted", open && "bg-muted")}
+                    data-kind={entry.kind}
+                    data-id={entry.kind === "error" ? entry.error.code : entry.id}
+                    data-name={entry.kind === "event" ? entry.name : undefined}
+                    data-state={open ? "selected" : undefined}
+                    onClick={() => setOpenKey(open ? undefined : entry.key)}
+                  >
+                    <td className={cn(cell, "font-mono text-muted-foreground")}>{time(entry.at)}</td>
+                    <EntryCells entry={entry} />
+                  </tr>
+                  {open && (
+                    <tr className="border-b">
+                      <td colSpan={5} className="bg-muted/40 p-2.5">
+                        <pre className="max-h-80 overflow-auto font-mono text-xs leading-relaxed">{JSON.stringify(json, null, 2)}</pre>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </DashboardCard>
   );
 }

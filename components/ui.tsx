@@ -112,7 +112,7 @@ export function DashboardCard({
         </div>
         {action ? <div className="flex flex-none items-center gap-2">{action}</div> : null}
       </div>
-      <div className="min-w-0 flex-1 px-5 pt-4 pb-5">{children}</div>
+      <div className="min-h-0 min-w-0 flex-1 px-5 pt-4 pb-5">{children}</div>
       {footer ? <div className="flex items-center justify-between gap-4 border-t py-2 pr-3 pl-5 text-xs text-muted-foreground">{footer}</div> : null}
     </div>
   );

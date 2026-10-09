@@ -1,5 +1,6 @@
 // Primary navigation, trimmed from Treewatcher's components/sidebar-nav.tsx: the
-// dashboard with its section anchors (highlighted as they scroll past) and Recordings.
+// dashboard with its section anchors (highlighted as they scroll past), Recordings, and
+// the test Console.
 "use client";
 
 import Link from "next/link";
@@ -70,7 +71,7 @@ export function SidebarNav() {
   const active = useActiveSection(onDashboard);
 
   return (
-    <nav aria-label="Primary navigation" className="grid gap-0.5 max-md:grid-cols-2 max-md:gap-1">
+    <nav aria-label="Primary navigation" className="grid gap-0.5 max-md:grid-cols-3 max-md:gap-1">
       <p className="eyebrow mb-1 px-2.5 max-md:hidden">Web analytics</p>
       <Link aria-current={onDashboard ? "page" : undefined} className={itemClass} href="/">
         <Icon d="M3 16V9m7 7V4m7 12v-5M2 16.5h16" />
@@ -102,6 +103,10 @@ export function SidebarNav() {
       <Link aria-current={pathname.startsWith("/recordings") ? "page" : undefined} className={cn(itemClass, "max-md:row-start-1 max-md:col-start-2")} href="/recordings">
         <Icon d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15ZM8.5 7.25v5.5l4.25-2.75z" />
         <span>Recordings</span>
+      </Link>
+      <Link aria-current={pathname.startsWith("/console") ? "page" : undefined} className={cn(itemClass, "max-md:row-start-1 max-md:col-start-3")} href="/console">
+        <Icon d="M3.5 5.5 7.5 10l-4 4.5M10 15h6.5" />
+        <span>Console</span>
       </Link>
     </nav>
   );

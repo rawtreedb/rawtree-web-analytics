@@ -49,7 +49,7 @@ Two notes on `page_view` data follow the recipes: [bots](#bots) and [acquisition
   "sdk": "@rawtree/analytics@0.1.0",
   "session_id": "b1ead18f-201e-4187-89cb-06cd66bfefc0",
   "anonymous_id": "e064463e-aee3-42cc-8b75-5d8ef844539c",
-  "page_url": "http://localhost:3001/",
+  "page_url": "https://example.com/",
   "page_path": "/",
   "properties": { "page_view_id": "aaebbe26-6d7b-4133-abc3-72649c3c86ac", "path": "/", "navigation": "initial" }
 }
@@ -96,7 +96,7 @@ LIMIT 50
   "session_id": "ee2a4536-f4b0-482e-8571-c1c04fd2bd94",
   "anonymous_id": "bb2bafdd-ef7b-4f2e-b62a-7382cec43491",
   "user_id": "acct_e3309d5159c7997018",
-  "page_url": "http://localhost:3001/login",
+  "page_url": "https://example.com/login",
   "page_path": "/login",
   "properties": { "page_view_id": "f18cdb4c-bff9-4b74-bdb3-f13e61c12250", "path": "/login", "reason": "hidden" }
 }
@@ -146,7 +146,7 @@ One delegated listener sends `cta_click { cta_id, placement }`. It runs in the c
   "sdk": "@rawtree/analytics@0.1.0",
   "session_id": "b1ead18f-201e-4187-89cb-06cd66bfefc0",
   "anonymous_id": "e064463e-aee3-42cc-8b75-5d8ef844539c",
-  "page_url": "http://localhost:3001/",
+  "page_url": "https://example.com/",
   "page_path": "/",
   "properties": { "cta_id": "nav_pricing", "placement": "header" }
 }
@@ -190,7 +190,7 @@ ORDER BY clicks DESC
   "sdk": "@rawtree/analytics@0.1.0",
   "session_id": "b1ead18f-201e-4187-89cb-06cd66bfefc0",
   "anonymous_id": "e064463e-aee3-42cc-8b75-5d8ef844539c",
-  "page_url": "http://localhost:3001/pricing",
+  "page_url": "https://example.com/pricing",
   "page_path": "/pricing",
   "properties": { "page_view_id": "5f0a1c9e-2b7d-4f3a-8c61-1d2e3f4a5b6c", "path": "/pricing", "threshold": 50, "scrollable": true }
 }
@@ -246,7 +246,7 @@ ORDER BY page_views_with_scroll_data DESC
   "sdk": "@rawtree/analytics@0.1.0",
   "session_id": "b1ead18f-201e-4187-89cb-06cd66bfefc0",
   "anonymous_id": "e064463e-aee3-42cc-8b75-5d8ef844539c",
-  "page_url": "http://localhost:3001/pricing",
+  "page_url": "https://example.com/pricing",
   "page_path": "/pricing",
   "properties": { "page_view_id": "aaebbe26-6d7b-4133-abc3-72649c3c86ac", "path": "/", "visible_ms": 427, "elapsed_ms": 427 }
 }
@@ -305,7 +305,7 @@ ORDER BY page_views DESC
   "sdk": "@rawtree/analytics@0.1.0",
   "session_id": "ee2a4536-f4b0-482e-8571-c1c04fd2bd94",
   "anonymous_id": "bb2bafdd-ef7b-4f2e-b62a-7382cec43491",
-  "page_url": "http://localhost:3001/login",
+  "page_url": "https://example.com/login",
   "page_path": "/login",
   "properties": {
     "metric_name": "CLS",
@@ -454,7 +454,7 @@ ORDER BY day
   "session_id": "b1ead18f-201e-4187-89cb-06cd66bfefc0",
   "anonymous_id": "e064463e-aee3-42cc-8b75-5d8ef844539c",
   "user_id": "acct_e3309d5159c7997018",
-  "page_url": "http://localhost:3001/app",
+  "page_url": "https://example.com/app",
   "page_path": "/app",
   "properties": { "feature": "search" }
 }
@@ -528,7 +528,7 @@ ORDER BY outcomes DESC
 
 **Data.** Every browser event carries `user_agent` (the browser's `navigator.userAgent`). Server events take it from `context.userAgent`, and otherwise the collector uses the request's `User-Agent` header. Crawlers that run JavaScript (headless browsers, some AI fetchers) send page views like any visitor. The dashboard classifies them with `lib/crawlers.ts` (AI retrieval, AI training, search indexer, social preview, SEO tool, script or headless).
 
-**Test console.** The *Simulated traffic* card sends one `page_view` per crawler preset with `sendEvent("page_view", properties, { userAgent })`. Each click is a new visitor: a throwaway `createAnalytics({ persistence: "memory" })` client, so bots get their own `anonymous_id` and `session_id` and never touch yours.
+**Test console.** The *Simulated traffic* card on the dashboard's Console page (`/console`) sends one `page_view` per crawler preset with `sendEvent("page_view", properties, { userAgent })`. Each click is a new visitor: a throwaway `createAnalytics({ persistence: "memory" })` client, so bots get their own `anonymous_id` and `session_id` and never touch yours.
 
 ```sql
 -- Page views by user agent, last 7 days (classify the result with lib/crawlers.ts)
@@ -547,7 +547,7 @@ LIMIT 50
 
 **Data.** `referrer` is `document.referrer` and `page_url` keeps the `utm_*` parameters (the SDK's default `allowedQueryParams`; anything else is stripped). Attribute a visitor to the referrer and UTM values of their first page view.
 
-**Test console.** The *Acquisition* buttons send a `page_view` as a new visitor on `/pricing?utm_source=...&utm_medium=...&utm_campaign=...` with a referrer (Google, none for the newsletter, Hacker News). The SDK reads both from the page, so the console swaps the URL (`history.replaceState`) and `document.referrer` only for the synchronous `sendEvent` call.
+**Test console.** The *Acquisition* buttons send a `page_view` as a new visitor on `/pricing?utm_source=...&utm_medium=...&utm_campaign=...` with a referrer (Google, none for the newsletter, Hacker News). The SDK reads both from the page by default; the console overrides them per event with the `pageUrl` and `referrer` options of `sendEvent`.
 
 ```sql
 -- First-touch source per visitor, last 7 days

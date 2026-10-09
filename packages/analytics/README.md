@@ -27,7 +27,7 @@ analytics.stop();                 // consent withdrawn
 
 Page URL, referrer, and user agent come from the browser. Override them per event with `sendEvent(name, properties, { pageUrl, referrer, userAgent })`, for example to simulate crawlers or campaign visits in tests. Overrides are sanitized the same way, and `referrer: ""` means none.
 
-Nothing is tracked automatically. Event names and properties are yours. See the [tracking recipes](https://github.com/rawtreedb/rawtree-web-analytics/blob/main/examples/test-console/recipes/RECIPES.md) for page views, CTA clicks, scroll depth, web vitals, signups, and more.
+Nothing is tracked automatically. Event names and properties are yours. See the [tracking recipes](https://github.com/rawtreedb/rawtree-web-analytics/blob/main/examples/recipes/RECIPES.md) for page views, CTA clicks, scroll depth, web vitals, signups, and more.
 
 | Option | Default | Meaning |
 | --- | --- | --- |

@@ -38,10 +38,10 @@
     "test/**/*.ts",
     "packages/analytics/src/**/*.ts",
     "packages/analytics/test/**/*.ts",
+    "examples/recipes/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "examples"
+    "node_modules"
   ]
 }

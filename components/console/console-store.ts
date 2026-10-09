@@ -1,12 +1,14 @@
 // Test console state: owns the analytics client lifecycle (driven by consent), wraps fetch
-// to observe every collector request, and polls the console server for stored rows.
+// to observe every collector request, and polls /api/console/stored for stored rows.
 // React reads it through useConsole() (useSyncExternalStore); no state library needed.
+// The client lives in this module, so it survives navigation; the recorder runs only
+// while the console page is mounted (startConsole/stopConsole), so it never records
+// the rest of the dashboard.
 
 import { type Analytics, type AnalyticsError, createAnalytics, type Properties } from "@rawtree/analytics";
 import type { CollectRequest, EventInput, RecordingPartInput } from "@rawtree/analytics/protocol";
 import { useSyncExternalStore } from "react";
 
-export type Config = { collectorUrl: string; database: string; serverEvents: boolean; storageCheck: boolean };
 export type Consent = { analytics: boolean; recording: boolean };
 export type Identity = { anonymousId: string; sessionId: string; recordingId: string };
 
@@ -20,8 +22,7 @@ export type Storage =
   | { state: "waiting" } // not delivered yet
   | { state: "checking"; since: number }
   | { state: "stored" }
-  | { state: "missing" }
-  | { state: "unconfigured" };
+  | { state: "missing" };
 
 export type EventEntry = {
   kind: "event";
@@ -53,8 +54,6 @@ export type ErrorEntry = { kind: "error"; key: string; at: number; error: Analyt
 export type Entry = EventEntry | RecordingEntry | ErrorEntry;
 
 export type ConsoleState = {
-  config?: Config;
-  configError?: string;
   consent: Consent;
   identity?: Identity;
   recording: "off" | "loading" | "on";
@@ -66,6 +65,7 @@ export type ConsoleState = {
   maskText: boolean;
 };
 
+export const COLLECT_ENDPOINT = "/api/console/collect";
 const CONSENT_KEY = "rawtree_test_console:consent";
 const POLL_MS = 1500;
 const STORE_TIMEOUT_MS = 30_000;
@@ -80,7 +80,10 @@ function loadConsent(): Consent {
   }
 }
 
-let state: ConsoleState = { consent: loadConsent(), recording: "off", entries: [], recordingBytesSent: 0, maskText: false };
+// Also the server snapshot: consent is read from localStorage only after mount.
+const initialState: ConsoleState = { consent: { analytics: false, recording: false }, recording: "off", entries: [], recordingBytesSent: 0, maskText: false };
+let state = initialState;
+let mounted = false;
 
 // rrweb payloads the collector accepted, kept so the playground can prove what never left the page.
 const sentRecordingPayloads: string[] = [];
@@ -131,7 +134,7 @@ function addEntry(entry: Entry): void {
 }
 
 function deliveredStorage(): Storage {
-  return state.config?.storageCheck ? { state: "checking", since: Date.now() } : { state: "unconfigured" };
+  return { state: "checking", since: Date.now() };
 }
 
 // ---------- collector requests ----------
@@ -155,7 +158,8 @@ function recordOutcome(events: EventInput[], parts: RecordingPartInput[], status
     }
   }
 
-  const byRecording = Map.groupBy(parts, (part) => part.recording_id);
+  const byRecording = new Map<string, RecordingPartInput[]>();
+  for (const part of parts) byRecording.set(part.recording_id, [...(byRecording.get(part.recording_id) ?? []), part]);
   for (const [recordingId, recordingParts] of byRecording) {
     const keys = sentPartKeys.get(recordingId) ?? new Set<string>();
     sentPartKeys.set(recordingId, keys);
@@ -182,8 +186,13 @@ function recordOutcome(events: EventInput[], parts: RecordingPartInput[], status
   if (ok) void pollStorage();
 }
 
-/** fetch for the SDK: same behavior, but every request's outcome is recorded per event ID / recording. */
+/**
+ * fetch for the SDK: every request's outcome is recorded per event ID / recording. The SDK sends
+ * with `credentials: "omit"` (right for a third-party collector), but the console's collector is
+ * same-origin and, in sign-in mode, needs the visitor's sign-in cookie to know where to write.
+ */
 const instrumentedFetch: typeof fetch = async (input, init) => {
+  init = { ...init, credentials: "same-origin" };
   let body: Partial<CollectRequest> = {};
   try {
     if (typeof init?.body === "string") body = JSON.parse(init.body) as Partial<CollectRequest>;
@@ -214,10 +223,10 @@ function onSdkError(error: AnalyticsError): void {
 // ---------- consent and lifecycle ----------
 
 async function applyConsent(): Promise<void> {
-  const { config, consent } = state;
-  if (!config) return;
+  const { consent } = state;
+  if (!mounted) return;
   if (consent.analytics && !client) {
-    client = createAnalytics({ endpoint: config.collectorUrl, fetch: instrumentedFetch, onError: onSdkError, flushIntervalMs: 2000 });
+    client = createAnalytics({ endpoint: COLLECT_ENDPOINT, fetch: instrumentedFetch, onError: onSdkError, flushIntervalMs: 2000 });
   }
   if (stopRecorder && !(consent.analytics && consent.recording)) {
     stopRecorder();
@@ -234,9 +243,9 @@ async function applyConsent(): Promise<void> {
     setState({ recording: "loading" });
     try {
       const { startRecording } = await import("@rawtree/analytics/recorder");
-      // Consent may have changed while the chunk loaded.
+      // Consent may have changed, or the page unmounted, while the chunk loaded.
       // Readable text (inputs stay masked) and dense mouse sampling so the replay cursor glides.
-      if (client && state.consent.analytics && state.consent.recording && !stopRecorder) {
+      if (mounted && client && state.consent.analytics && state.consent.recording && !stopRecorder) {
         stopRecorder = startRecording(client, {
           maskAllText: state.maskText,
           sampling: { mousemove: 30, mousemoveCallback: 200 },
@@ -268,15 +277,20 @@ export function setMaskText(maskText: boolean): void {
   void applyConsent();
 }
 
-export async function init(): Promise<void> {
-  try {
-    const response = await fetch("/api/config");
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    setState({ config: (await response.json()) as Config });
-    await applyConsent();
-  } catch (error) {
-    setState({ configError: error instanceof Error ? error.message : String(error) });
-  }
+/** Console page mounted: restore consent and start what it allows. */
+export function startConsole(): void {
+  mounted = true;
+  setState({ consent: loadConsent() });
+  void applyConsent();
+}
+
+/** Console page unmounted: stop recording (the next page is not the playground) and send what is queued. */
+export function stopConsole(): void {
+  mounted = false;
+  stopRecorder?.();
+  stopRecorder = undefined;
+  void client?.flush();
+  setState({ recording: "off" });
 }
 
 export async function flush(): Promise<void> {
@@ -309,9 +323,8 @@ export async function sendAsVisitor(
   properties: Properties,
   options: { userAgent?: string; url?: string; referrer?: string } = {},
 ): Promise<string | undefined> {
-  const { config, consent } = state;
-  if (!config || !consent.analytics) return undefined;
-  const visitor = createAnalytics({ endpoint: config.collectorUrl, fetch: instrumentedFetch, onError: onSdkError, persistence: "memory" });
+  if (!state.consent.analytics) return undefined;
+  const visitor = createAnalytics({ endpoint: COLLECT_ENDPOINT, fetch: instrumentedFetch, onError: onSdkError, persistence: "memory" });
   const id = visitor.sendEvent(name, properties, {
     userAgent: options.userAgent,
     pageUrl: options.url && new URL(options.url, location.href).href,
@@ -337,9 +350,9 @@ export async function sendServerEvent(name: string, properties: Properties, even
   }
   let result: ServerEventResponse;
   try {
-    const response = await fetch("/api/server-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, properties, eventId }) });
+    const response = await fetch("/api/console/server-event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, properties, eventId }) });
     result = (await response.json()) as ServerEventResponse;
-    if (!response.ok && !result.error) result.error = `console server answered ${response.status}`;
+    if (!response.ok && !result.error) result.error = `server answered ${response.status}`;
   } catch (error) {
     result = { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -361,7 +374,7 @@ export async function sendServerEvent(name: string, properties: Properties, even
 
 // ---------- storage polling ----------
 
-type StoredResponse = { configured?: false; events?: Record<string, number>; recordings?: Record<string, { parts: number; uniqueParts: number }> };
+type StoredResponse = { events?: Record<string, number>; recordings?: Record<string, { parts: number; uniqueParts: number }> };
 let polling = false;
 
 async function pollStorage(): Promise<void> {
@@ -386,7 +399,7 @@ async function pollStorage(): Promise<void> {
 
       let stored: StoredResponse;
       try {
-        const response = await fetch("/api/stored", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventIds, recordingIds }) });
+        const response = await fetch("/api/console/stored", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventIds, recordingIds }) });
         if (!response.ok) continue;
         stored = (await response.json()) as StoredResponse;
       } catch {
@@ -395,7 +408,6 @@ async function pollStorage(): Promise<void> {
       updateEntries((entries) =>
         entries.map((entry) => {
           if (entry.kind === "error" || entry.storage.state !== "checking") return entry;
-          if (stored.configured === false) return { ...entry, storage: { state: "unconfigured" } };
           if (entry.kind === "event") {
             const rows = entry.id ? (stored.events?.[entry.id] ?? 0) : 0;
             return rows > 0 ? { ...entry, storedRows: rows, storage: { state: "stored" } } : entry;
@@ -418,5 +430,5 @@ function subscribe(listener: () => void): () => void {
 }
 
 export function useConsole(): ConsoleState {
-  return useSyncExternalStore(subscribe, () => state);
+  return useSyncExternalStore(subscribe, () => state, () => initialState);
 }
