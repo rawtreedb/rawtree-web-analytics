@@ -3,7 +3,7 @@
 
 import * as Q from "./queries.ts";
 import { previousRange, type Range } from "./range.ts";
-import { loadRawTreeConfig, RawTreeError, runQuery, tableName, type RawTreeConfig } from "./rawtree.ts";
+import { isMissingTable, loadRawTreeConfig, RawTreeError, runQuery, tableName, type RawTreeConfig } from "./rawtree.ts";
 import { planFetch, reassemble, type ChunkPlanRow, type ChunkRow, type RecordingGap } from "./reassembly.ts";
 
 const loadQueryConfig = (env?: Record<string, string | undefined>) => loadRawTreeConfig("RAWTREE_QUERY_KEY", env);
@@ -35,7 +35,7 @@ type PageRow = { path: string; pageViews: number; visitors: number };
 type TimeStats = { views: number; medianMs: number; p75Ms: number; engagedViews: number; quickExits: number };
 type ScrollStats = { views: number; reached25: number; reached50: number; reached75: number; reached100: number };
 
-export type DashboardData = Awaited<ReturnType<typeof getDashboard>>;
+export type DashboardData = NonNullable<Awaited<ReturnType<typeof getDashboard>>>;
 
 /** Every dashboard section for one window and its previous period, queried in parallel. */
 export async function getDashboard(range: Range, config: RawTreeConfig = loadQueryConfig(), fetchImpl?: typeof fetch) {
@@ -43,7 +43,13 @@ export async function getDashboard(range: Range, config: RawTreeConfig = loadQue
   const one = async <T>(sql: string) => (await run<T>(sql))[0]!; // aggregates without GROUP BY return one row
   const table = tableName(config, "events");
   // Columns appear with the first event that carries them; the queries read missing ones as NULL.
-  const columns = new Set((await run<{ name: string }>(Q.columnsSql(table))).map((row) => row.name));
+  // Before the first event there is no table at all: return null for "no data yet".
+  const columnRows = await run<{ name: string }>(Q.columnsSql(table)).catch((error) => {
+    if (isMissingTable(error)) return null;
+    throw error;
+  });
+  if (!columnRows) return null;
+  const columns = new Set(columnRows.map((row) => row.name));
   const scope = (window: Range): Q.Scope => ({ table, columns, ...window });
   const period = (window: Range) =>
     all({
@@ -116,9 +122,14 @@ function validateRecordingId(recordingId: string): string {
   return recordingId;
 }
 
-/** The newest recording's ID, or undefined when there is none. */
+/** The newest recording's ID, or undefined when there is none (including before the first recording). */
 export async function getLatestRecordingId(config: RawTreeConfig = loadQueryConfig()): Promise<string | undefined> {
-  return (await runQuery<{ recordingId: string }>(config, Q.latestRecording(tableName(config, "recordings"))))[0]?.recordingId;
+  try {
+    return (await runQuery<{ recordingId: string }>(config, Q.latestRecording(tableName(config, "recordings"))))[0]?.recordingId;
+  } catch (error) {
+    if (isMissingTable(error)) return undefined;
+    throw error;
+  }
 }
 
 /** One recording's summary (undefined when not stored) and the 50 newest recordings. */

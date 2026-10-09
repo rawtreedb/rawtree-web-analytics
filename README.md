@@ -109,7 +109,7 @@ Then point the SDK at `https://<your-deployment>/api/collect`.
 Before you deploy, know what is public:
 
 - **The dashboard and recordings have no login.** Anyone with the URL sees your analytics and can replay recorded sessions. Keep recordings masked (the default) or put the app behind your own access control if that's not what you want.
-- **The collector accepts events from the allowed origins** and has no rate limiting yet. Origin checks stop other websites' browsers, not scripts.
+- **The collector accepts events from the allowed origins** and doesn't rate limit. Origin checks stop other websites' browsers, not scripts, so add rate limiting for `/api/collect` on your platform if you need it (for example a firewall rule on Vercel).
 - **Don't deploy the test console.** It holds the server token and is built for local testing.
 
 ## ✍️ Add it to your app

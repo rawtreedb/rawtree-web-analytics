@@ -92,7 +92,7 @@ function RangeFilter({ range }: { range: ResolvedRange }) {
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const range = resolveRange(await searchParams);
-  let data: DashboardData | undefined;
+  let data: DashboardData | null | undefined;
   let error: string | undefined;
   try {
     data = await getDashboard(range);
@@ -115,7 +115,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         }
         title="Dashboard"
       />
-      {data ? <Dashboard data={data} range={range} /> : <ErrorCard>{error}</ErrorCard>}
+      {data ? (
+        <Dashboard data={data} range={range} />
+      ) : data === null ? (
+        <CardEmpty>No events yet. Add the SDK to your app (or send some from the test console) and they will show up here.</CardEmpty>
+      ) : (
+        <ErrorCard>{error}</ErrorCard>
+      )}
     </div>
   );
 }

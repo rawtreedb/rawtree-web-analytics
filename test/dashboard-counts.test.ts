@@ -8,7 +8,7 @@ import { describe, it } from "node:test";
 import { toRecording } from "../lib/dashboard.ts";
 import { campaigns, EVENT_QUERIES, recordingList, recordingSummary, topPages, type Scope } from "../lib/queries.ts";
 import { resolveRange } from "../lib/range.ts";
-import { runQuery } from "../lib/rawtree.ts";
+import { isMissingTable, RawTreeError, runQuery } from "../lib/rawtree.ts";
 import { isBotUa, isCrawler } from "../lib/crawlers.ts";
 
 describe("counting SQL deduplicates", () => {
@@ -205,5 +205,14 @@ describe("resolveRange", () => {
     for (const params of [{}, { range: "bogus" }, { range: "custom", start: "nope", end: "2026-10-08T00:00:00Z" }, { range: "custom", start: "2026-10-08T00:00:00Z", end: "2026-10-01T00:00:00Z" }]) {
       assert.equal(resolveRange(params, now).key, "last_7_days");
     }
+  });
+});
+
+describe("isMissingTable", () => {
+  it("recognizes RawTree's missing-table error, which means no data yet", () => {
+    const body = '{"error":"rawtree_error","message":"Table events not found.","hint":"Check the table name and make sure it exists in your database."}';
+    assert.equal(isMissingTable(new RawTreeError(`RawTree query failed: ${body}`, 400)), true);
+    assert.equal(isMissingTable(new RawTreeError("RawTree query failed: Unknown expression identifier", 400)), false);
+    assert.equal(isMissingTable(new Error("Table events not found.")), false);
   });
 });

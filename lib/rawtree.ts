@@ -40,6 +40,9 @@ export class RawTreeError extends Error {
   }
 }
 
+/** RawTree creates a table with its first insert, so a missing table means no data yet. */
+export const isMissingTable = (error: unknown) => error instanceof RawTreeError && /table \S+ not found/i.test(error.message);
+
 export type Row = Record<string, string | number | boolean>;
 
 /**
