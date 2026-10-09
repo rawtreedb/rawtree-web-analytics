@@ -1,0 +1,48 @@
+name: Release SDK
+
+# Publishes @rawtree/analytics to npm when a tag like `analytics-v0.1.0` is pushed.
+# The tag must match packages/analytics/package.json. Auth uses npm trusted publishing
+# (OIDC, no stored token) once it's configured for this workflow on npmjs.com; an
+# NPM_TOKEN repository secret works as a fallback.
+
+on:
+  push:
+    tags: ["analytics-v*"]
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing and provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Use an npm that supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      - name: Check the tag matches the package version
+        run: |
+          expected="analytics-v$(node -p 'require("./packages/analytics/package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match $expected" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Publish
+        run: npm publish -w @rawtree/analytics --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

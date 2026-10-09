@@ -38,6 +38,16 @@ CI runs the same three checks on every pull request. Every pull request also get
 
 [AGENTS.md](AGENTS.md) has the same rules in more detail, for people and coding agents.
 
+## Releasing the SDK (maintainers)
+
+`@rawtree/analytics` is published to npm by the [Release SDK](.github/workflows/release-sdk.yml) workflow, with provenance.
+
+1. Bump `version` in `packages/analytics/package.json` in a pull request (semver: breaking changes to the event contract or the public API need a major version once we're past 0.x) and merge it.
+2. Tag the merge commit and push the tag: `git tag analytics-v0.2.0 && git push origin analytics-v0.2.0`.
+3. The workflow checks that the tag matches the version, runs the tests, and publishes.
+
+One-time setup: an npm account with publish rights on the `@rawtree` scope, and on npmjs.com a trusted publisher for this repository and the `release-sdk.yml` workflow (or an `NPM_TOKEN` repository secret). Provenance requires the repository to be public.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under the [Apache License 2.0](LICENSE).
