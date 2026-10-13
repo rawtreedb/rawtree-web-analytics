@@ -133,7 +133,8 @@ export function ConsoleApp({ database }: { database: string }) {
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <ConsentBar database={database} />
         <div className="grid min-h-0 flex-1 gap-4 @5xl:grid-cols-[400px_minmax(0,1fr)]">
-          <div className="grid min-h-0 auto-rows-max content-start gap-4 @5xl:-mr-2 @5xl:overflow-y-auto @5xl:overscroll-contain @5xl:pr-2">
+          {/* The scroll container clips what's outside its box; the padding (offset by the negative margin) keeps the cards' ring and shadow visible. */}
+          <div className="grid min-h-0 auto-rows-max content-start gap-4 @5xl:-m-2 @5xl:overflow-y-auto @5xl:overscroll-contain @5xl:p-2">
             <BrowserEventsCard />
             <ServerEventsCard />
             <TrafficCard />
@@ -189,7 +190,7 @@ function ConsentBar({ database }: { database: string }) {
   return (
     <section aria-label="Consent" className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl bg-card px-5 py-3 text-sm shadow-soft ring-1 ring-foreground/10">
       <div className="flex items-center gap-2 font-semibold">
-        <IconShieldCheck className="size-4 text-primary" /> Consent
+        <IconShieldCheck className="size-4 -translate-y-px text-muted-foreground" /> Consent
         <span className="text-xs font-normal text-muted-foreground">Nothing is sent until analytics is allowed. Stored in localStorage.</span>
       </div>
       <label className="flex items-center gap-3">
@@ -208,7 +209,7 @@ function ConsentBar({ database }: { database: string }) {
         )}
       </label>
       <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 border-t pt-2.5 text-xs text-muted-foreground">
-        <span>
+        <span className="w-full">
           Collector <Mono>{COLLECT_ENDPOINT}</Mono> · Database <Mono>{database}</Mono>
         </span>
         <IdField label="anonymous_id" value={identity?.anonymousId} testId="anonymous-id" variant="info" />
@@ -221,7 +222,8 @@ function ConsentBar({ database }: { database: string }) {
 
 const cardTitle = (icon: ReactNode, text: string) => (
   <span className="flex items-center gap-2">
-    {icon}
+    {/* Centered on the line box, the icon reads low next to Geist's capitals; nudge it up. */}
+    <span className="-translate-y-px text-muted-foreground">{icon}</span>
     {text}
   </span>
 );
@@ -247,7 +249,7 @@ function BrowserEventsCard() {
 
   return (
     <DashboardCard
-      title={cardTitle(<IconBrowser className="size-4 text-primary" />, "Browser events")}
+      title={cardTitle(<IconBrowser className="size-4" />, "Browser events")}
       description={consent.analytics ? "Recipe-shaped events with example properties." : "Turn on analytics consent to send events."}
     >
       <div className="flex flex-col gap-4">
@@ -286,7 +288,7 @@ function ServerEventsCard() {
   const { lastServerEvent } = useConsole();
   return (
     <DashboardCard
-      title={cardTitle(<IconServer className="size-4 text-primary" />, "Server events")}
+      title={cardTitle(<IconServer className="size-4" />, "Server events")}
       description="Sent by this app's server with createServerAnalytics and a stable event ID."
       info="Server events need no consent: they record outcomes your backend already knows. Resending with the same ID still counts once."
     >
@@ -314,7 +316,7 @@ function TrafficCard() {
   const { consent } = useConsole();
   return (
     <DashboardCard
-      title={cardTitle(<IconRobot className="size-4 text-primary" />, "Simulated traffic")}
+      title={cardTitle(<IconRobot className="size-4" />, "Simulated traffic")}
       info="Each click is a new visitor (own anonymous_id and session_id) sending one page_view. Your own IDs are untouched."
       description={consent.analytics ? "Crawler visits and campaign visits for the dashboard." : "Turn on analytics consent to send events."}
     >
@@ -389,7 +391,7 @@ function PlaygroundCard() {
   const panelSeen = open || recordingBytesSent > 0 ? found[SECRETS.panel] : undefined;
   return (
     <DashboardCard
-      title={cardTitle(<IconPlayerRecord className="size-4 text-primary" />, "Recording playground")}
+      title={cardTitle(<IconPlayerRecord className="size-4" />, "Recording playground")}
       info="Session recording captures the page structure and every change to it (plus clicks, scrolls, and typing), not video. Replay rebuilds the page from that data."
       description={recording === "off" ? "Turn on session recording in the consent row first." : "Change the page and check what stays private."}
       action={
@@ -608,7 +610,7 @@ function EventViewer() {
   return (
     <DashboardCard
       className="max-@5xl:max-h-[80vh]"
-      title={cardTitle(<IconCloudUpload className="size-4 text-primary" />, "Event viewer")}
+      title={cardTitle(<IconCloudUpload className="size-4" />, "Event viewer")}
       description="Newest first. Queued → Sent (collector 200) → Stored (found in RawTree). Click a row for the JSON as sent."
       action={<Badge>{entries.length} rows</Badge>}
     >

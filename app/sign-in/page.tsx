@@ -1,9 +1,10 @@
 // Sign-in mode only (no RAWTREE_QUERY_KEY / RAWTREE_INGEST_KEY). Layout follows
 // jev-pr-quality's sign-in page: connect with a RawTree account through Vercel Connect (when
 // RAWTREE_CONNECTOR is set) or with an API key, then a preview and how it works. `?method=key`
-// picks the API key tab without client JavaScript. Env mode redirects to the dashboard.
+// picks the API key tab without client JavaScript. Once connected, the page becomes step 2 of the
+// Connect flow: only the workspace picker and Disconnect. Env mode redirects to the dashboard.
 
-import { IconChartBar, IconChevronRight, IconCode, IconDatabase, IconExternalLink, IconSend, IconShieldCheck } from "@tabler/icons-react";
+import { IconChartBar, IconCheck, IconChevronRight, IconCode, IconDatabase, IconExternalLink, IconSend, IconShieldCheck } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -108,8 +109,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const connector = connectorInSignInMode();
   const session = (await cookies()).get(SESSION_COOKIE)?.value;
   const picker = await loadPicker(connector, session);
-  const useKey = !connector || method === "key";
   const connected = Boolean(picker.workspaces);
+  // Once connected, the API key form is out of reach until the visitor disconnects.
+  const useKey = !connected && (!connector || method === "key");
 
   return (
     <div className="flex min-h-dvh flex-col bg-background-extra">
@@ -134,17 +136,32 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         <BrandLines />
         <div className="relative z-10 flex w-full max-w-[500px] flex-col gap-4">
           <div className="grid gap-2 px-6 pb-2">
-            <h1 className="m-0 text-2xl font-semibold tracking-tight">Web analytics on RawTree</h1>
+            <h1 className="m-0 text-2xl font-semibold tracking-tight">{connected ? "Choose your database" : "Web analytics on RawTree"}</h1>
             <p className="m-0 text-sm text-muted-foreground">
-              Send your own events and session recordings with one SDK, keep every row in your RawTree database, and see traffic, acquisition,
-              engagement, and bots without counting retries twice.
+              {connected
+                ? "Pick the RawTree organization, cluster, and database where your events are stored."
+                : "Send your own events and session recordings with one SDK, keep every row in your RawTree database, and see traffic, acquisition, engagement, and bots without counting retries twice."}
             </p>
           </div>
 
           <section className={cn(panel, "grid gap-5")}>
             <div className="grid gap-3">
-              <h2 className="m-0 text-lg font-semibold">Connect to RawTree</h2>
-              {connector ? (
+              {connected ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="m-0 flex items-center gap-2 text-sm font-semibold">
+                    <span className="flex size-5 items-center justify-center rounded-full bg-success/15 text-success">
+                      <IconCheck aria-hidden className="size-3.5" />
+                    </span>
+                    Connected to RawTree
+                  </p>
+                  <button className={cn(link, "text-sm")} form="disconnect" type="submit">
+                    Disconnect
+                  </button>
+                </div>
+              ) : (
+                <h2 className="m-0 text-lg font-semibold">Connect to RawTree</h2>
+              )}
+              {connector && !connected ? (
                 <nav aria-label="Connection method" className="grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
                   {[
                     { label: "RawTree account", href: "/sign-in", active: !useKey },
@@ -162,23 +179,18 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   ))}
                 </nav>
               ) : null}
-              <p className="m-0 text-sm">
-                {useKey ? (
-                  <>
-                    Enter an API key that can <strong>read and write</strong> your analytics database: the dashboard reads it, and the console sends test
-                    events to it.
-                  </>
-                ) : connected ? (
-                  <>
-                    Connected to RawTree. Choose where your events are stored.{" "}
-                    <button className={link} form="disconnect" type="submit">
-                      Disconnect
-                    </button>
-                  </>
-                ) : (
-                  "Sign in with your RawTree account to see your traffic, acquisition, engagement, bots, and session replays."
-                )}
-              </p>
+              {connected ? null : (
+                <p className="m-0 text-sm">
+                  {useKey ? (
+                    <>
+                      Enter an API key that can <strong>read and write</strong> your analytics database: the dashboard reads it, and the console sends
+                      test events to it.
+                    </>
+                  ) : (
+                    "Sign in with your RawTree account to see your traffic, acquisition, engagement, bots, and session replays."
+                  )}
+                </p>
+              )}
               {expired ? <p className="m-0 rounded-lg bg-muted px-3 py-2 text-sm">RawTree rejected your credentials. Sign in again.</p> : null}
               {picker.error && !useKey ? <p className="m-0 text-sm text-muted-foreground">{picker.error}</p> : null}
             </div>
@@ -196,80 +208,86 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
               </div>
             )}
           </section>
-          {/* Target of the Disconnect button, which sits inside a paragraph. */}
+          {/* Target of the Disconnect button, which sits outside the picker's form. */}
           <form action={signOut} className="hidden" id="disconnect" />
 
-          <aside className={cn(panel, "grid gap-2 text-sm")}>
-            {useKey ? (
-              <>
-                <p className="m-0 font-semibold">Your key stays on the server side of this app</p>
-                <p className="m-0 text-muted-foreground">
-                  It's kept in an HTTP-only cookie that page scripts can't read, used only to run the dashboard's own queries and the console's test
-                  events, never logged, and cleared when you sign out or close the browser. Create one with{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">rtree key create --permission read_write --database web_analytics</code>.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="m-0 font-semibold">No keys to copy or paste</p>
-                <p className="m-0 text-muted-foreground">
-                  <span className="text-foreground">Vercel Connect</span> holds your RawTree grant; this browser only keeps a session cookie. The dashboard
-                  runs its own fixed queries and never accepts SQL from the browser. Disconnect revokes access.
-                </p>
-              </>
-            )}
-          </aside>
+          {connected ? null : (
+            <aside className={cn(panel, "grid gap-2 text-sm")}>
+              {useKey ? (
+                <>
+                  <p className="m-0 font-semibold">Your key stays on the server side of this app</p>
+                  <p className="m-0 text-muted-foreground">
+                    It's kept in an HTTP-only cookie that page scripts can't read, used only to run the dashboard's own queries and the console's test
+                    events, never logged, and cleared when you sign out or close the browser. Create one with{" "}
+                    <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">rtree key create --permission read_write --database web_analytics</code>.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="m-0 font-semibold">No keys to copy or paste</p>
+                  <p className="m-0 text-muted-foreground">
+                    <span className="text-foreground">Vercel Connect</span> holds your RawTree grant; this browser only keeps a session cookie. The dashboard
+                    runs its own fixed queries and never accepts SQL from the browser. Disconnect revokes access.
+                  </p>
+                </>
+              )}
+            </aside>
+          )}
         </div>
 
-        <figure className={cn(panel, "relative z-10 m-0 mt-12 w-full max-w-[1120px] p-3 sm:p-6")}>
-          <figcaption className="mb-4 grid gap-1 px-2 pt-2 text-center sm:mb-6 sm:pt-0">
-            <span className="text-lg font-semibold">What you'll see</span>
-            <span className="text-sm text-muted-foreground">Traffic, acquisition, engagement, bots, and session replays. Preview uses sample data.</span>
-          </figcaption>
-          <Image
-            alt="Dashboard preview with headline numbers, the traffic trend, and the dashboard sections"
-            className="h-auto w-full rounded-xl border"
-            placeholder="blur"
-            sizes="(min-width: 1152px) 1072px, calc(100vw - 56px)"
-            src={overview}
-          />
-        </figure>
+        {connected ? null : (
+          <>
+            <figure className={cn(panel, "relative z-10 m-0 mt-12 w-full max-w-[1120px] p-3 sm:p-6")}>
+              <figcaption className="mb-4 grid gap-1 px-2 pt-2 text-center sm:mb-6 sm:pt-0">
+                <span className="text-lg font-semibold">What you'll see</span>
+                <span className="text-sm text-muted-foreground">Traffic, acquisition, engagement, bots, and session replays. Preview uses sample data.</span>
+              </figcaption>
+              <Image
+                alt="Dashboard preview with headline numbers, the traffic trend, and the dashboard sections"
+                className="h-auto w-full rounded-xl border"
+                placeholder="blur"
+                sizes="(min-width: 1152px) 1072px, calc(100vw - 56px)"
+                src={overview}
+              />
+            </figure>
 
-        <section aria-labelledby="how-it-works" className={cn(panel, "relative z-10 mt-6 w-full max-w-[1120px]")}>
-          <div className="mb-6 grid gap-1 text-center">
-            <h2 className="m-0 text-lg font-semibold" id="how-it-works">
-              How it works
-            </h2>
-            <p className="m-0 text-sm text-muted-foreground">From your app to your dashboard.</p>
-          </div>
-          <ol className="m-0 grid list-none gap-3 p-0 md:grid-cols-4">
-            {HOW_IT_WORKS.map(({ icon: Icon, title, body }, index) => (
-              <li className="grid content-start gap-3 rounded-xl border bg-muted/50 p-4" key={title}>
-                <div className="flex items-center justify-between">
-                  <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon aria-hidden className="size-4" />
-                  </span>
-                  <span className="numeric text-xs text-muted-foreground">0{index + 1}</span>
-                </div>
-                <div className="grid gap-1">
-                  <h3 className="m-0 text-sm font-semibold">{title}</h3>
-                  <p className="m-0 text-sm text-muted-foreground">{body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-            <p className="m-0 flex items-start gap-2">
-              <IconShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-              {useKey
-                ? "Your site sends events with an insert-only key. Your dashboard key stays in an HTTP-only cookie."
-                : "Your site sends events with an insert-only key. Viewers sign in with their own RawTree account."}
-            </p>
-            <External className={cn(link, "shrink-0")} href={`${LINKS.github}#-how-it-works`}>
-              Technical details
-            </External>
-          </div>
-        </section>
+            <section aria-labelledby="how-it-works" className={cn(panel, "relative z-10 mt-6 w-full max-w-[1120px]")}>
+              <div className="mb-6 grid gap-1 text-center">
+                <h2 className="m-0 text-lg font-semibold" id="how-it-works">
+                  How it works
+                </h2>
+                <p className="m-0 text-sm text-muted-foreground">From your app to your dashboard.</p>
+              </div>
+              <ol className="m-0 grid list-none gap-3 p-0 md:grid-cols-4">
+                {HOW_IT_WORKS.map(({ icon: Icon, title, body }, index) => (
+                  <li className="grid content-start gap-3 rounded-xl border bg-muted/50 p-4" key={title}>
+                    <div className="flex items-center justify-between">
+                      <span className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Icon aria-hidden className="size-4" />
+                      </span>
+                      <span className="numeric text-xs text-muted-foreground">0{index + 1}</span>
+                    </div>
+                    <div className="grid gap-1">
+                      <h3 className="m-0 text-sm font-semibold">{title}</h3>
+                      <p className="m-0 text-sm text-muted-foreground">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-4 flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/5 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <p className="m-0 flex items-start gap-2">
+                  <IconShieldCheck aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
+                  {useKey
+                    ? "Your site sends events with an insert-only key. Your dashboard key stays in an HTTP-only cookie."
+                    : "Your site sends events with an insert-only key. Viewers sign in with their own RawTree account."}
+                </p>
+                <External className={cn(link, "shrink-0")} href={`${LINKS.github}#-how-it-works`}>
+                  Technical details
+                </External>
+              </div>
+            </section>
+          </>
+        )}
       </main>
 
       <footer className="border-t">
