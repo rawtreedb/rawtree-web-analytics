@@ -3,7 +3,7 @@
 // segmented-control). Annotations, dialogs, and tooltips-as-library are dropped.
 "use client";
 
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ComposedChart, Line, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDay, formatLongDay, formatValue, relativeChange, type ValueFormat } from "../lib/format.ts";
 import { Tooltip as HoverTip } from "./tooltip.tsx";
@@ -11,12 +11,13 @@ import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, SegmentedControl
 
 const previousPeriodInfo = "Change versus the previous period of the same length.";
 // Dotted underline (a border, since text-decoration skips the inline-flex Delta) marks the change as hoverable.
-const deltaTrigger = "inline-flex cursor-help border-b border-dotted border-muted-foreground/60 pb-px outline-none hover:border-muted-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring";
+// Lifted 6px so the underline, not the text baseline, lines up with the bottom of the number beside it
+// (top, not translate: a transform would become the containing block of the fixed tooltip).
+const deltaTrigger = "relative -top-1.5 inline-flex cursor-help border-b border-dotted border-muted-foreground/60 pb-px outline-none hover:border-muted-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring";
 const tooltipClass = "min-w-44 max-w-72 rounded-lg border bg-card px-3 py-2.5 text-xs text-card-foreground shadow-popover";
 
 /** Decorative daily trend for stat cards. */
 function Sparkline({ values, color = chartColors.primary, label }: { values: readonly number[]; color?: string; label: string }) {
-  const gradient = `spark-${useId().replace(/:/g, "")}`;
   return (
     <AreaChart
       accessibilityLayer={false}
@@ -27,14 +28,8 @@ function Sparkline({ values, color = chartColors.primary, label }: { values: rea
       role="img"
       style={{ width: "100%", height: "100%" }}
     >
-      <defs>
-        <linearGradient id={gradient} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.28} />
-          <stop offset="100%" stopColor={color} stopOpacity={0} />
-        </linearGradient>
-      </defs>
       <YAxis domain={[0, "dataMax"]} hide />
-      <Area dataKey="value" dot={false} fill={`url(#${gradient})`} isAnimationActive={false} stroke={color} strokeWidth={1.6} type="monotone" />
+      <Area dataKey="value" dot={false} fill={color} fillOpacity={0.12} isAnimationActive={false} stroke={color} strokeWidth={1.6} type="monotone" />
     </AreaChart>
   );
 }
@@ -68,29 +63,24 @@ export function StatCard({
 }) {
   return (
     <article
-      className={cn(
-        "relative flex min-h-34 flex-col gap-1.5 rounded-2xl bg-card px-4.5 pt-4 text-card-foreground shadow-soft ring-1 ring-foreground/10",
-        trend && trend.length > 1 ? "pb-11" : "pb-3.5",
-      )}
+      className="flex min-h-34 flex-col gap-1.5 rounded-2xl bg-card px-4.5 pt-4 pb-4 text-card-foreground shadow-soft ring-1 ring-foreground/10"
       data-testid={`stat-${label.toLowerCase().replace(/ /g, "-")}`}
     >
       <header className="flex items-center gap-1">
         <h3 className="m-0 text-xs font-semibold text-muted-foreground">{label}</h3>
         {info ? <InfoTip>{info}</InfoTip> : null}
       </header>
-      <p className="numeric relative z-1 m-0 text-3xl font-semibold">{formatValue(value, format)}</p>
-      <div className="relative z-1 flex flex-1 flex-wrap content-start items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <p className="numeric m-0 text-3xl font-semibold">{formatValue(value, format)}</p>
         {change !== undefined ? (
-          <>
-            <HoverTip className={deltaTrigger} content={previousPeriodInfo}>
-              <Delta inverse={inverse} kind={changeKind} neutral={neutral} value={change} />
-            </HoverTip>
-          </>
+          <HoverTip className={cn(deltaTrigger, "text-xs")} content={previousPeriodInfo}>
+            <Delta inverse={inverse} kind={changeKind} neutral={neutral} value={change} />
+          </HoverTip>
         ) : null}
-        {hint ? <span>{hint}</span> : null}
       </div>
+      {hint ? <p className="m-0 text-xs text-muted-foreground">{hint}</p> : null}
       {trend && trend.length > 1 ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 overflow-hidden rounded-b-2xl opacity-85">
+        <div className="pointer-events-none mt-auto h-14 pt-4">
           <Sparkline color={trendColor} label={`${label} by day`} values={trend} />
         </div>
       ) : null}
@@ -188,21 +178,12 @@ function TimeSeriesChart({
   showComparison: boolean;
   label: string;
 }) {
-  const gradientPrefix = `ts-${useId().replace(/:/g, "")}`;
   return (
     <div
       className="[&_.recharts-cartesian-axis-tick-value]:font-mono [&_.recharts-cartesian-axis-tick-value]:tracking-tight [&_:focus:not(:focus-visible)]:outline-none"
       style={{ height: 260 }}
     >
       <ComposedChart aria-label={label} data={[...data]} margin={{ top: 16, right: 24, bottom: 0, left: 0 }} responsive style={{ width: "100%", height: "100%" }}>
-        <defs>
-          {series.map((item) => (
-            <linearGradient id={`${gradientPrefix}-${item.key}`} key={item.key} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor={item.color} stopOpacity={0.24} />
-              <stop offset="100%" stopColor={item.color} stopOpacity={0.02} />
-            </linearGradient>
-          ))}
-        </defs>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
         <XAxis
           axisLine={false}
@@ -262,7 +243,8 @@ function TimeSeriesChart({
             activeDot={{ r: 4, strokeWidth: 0 }}
             dataKey={item.key}
             dot={data.length === 1}
-            fill={`url(#${gradientPrefix}-${item.key})`}
+            fill={item.color}
+            fillOpacity={0.12}
             isAnimationActive={false}
             key={item.key}
             name={item.label}

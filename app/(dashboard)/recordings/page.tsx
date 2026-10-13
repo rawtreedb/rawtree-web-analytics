@@ -2,9 +2,9 @@
 // (/recordings/[id], with the list in its sidebar), or shows why there is nothing to play.
 
 import { redirect } from "next/navigation";
-import { requireAccess, signInAgainIfRejected } from "../../lib/access.ts";
-import { getLatestRecordingId, queryErrorMessage } from "../../lib/dashboard.ts";
-import { CardEmpty, DashboardCard, ErrorCard, PageToolbar } from "../../components/ui.tsx";
+import { requireAccess, signInAgainIfRejected } from "../../../lib/access.ts";
+import { getLatestRecordingId, queryErrorMessage } from "../../../lib/dashboard.ts";
+import { CardEmpty, DashboardCard, ErrorCard, PageToolbar } from "../../../components/ui.tsx";
 
 export const dynamic = "force-dynamic";
 

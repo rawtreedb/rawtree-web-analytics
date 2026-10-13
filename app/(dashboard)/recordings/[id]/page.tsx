@@ -3,11 +3,11 @@
 // /api/recordings/[id] in bounded parts.
 
 import Link from "next/link";
-import { requireAccess, signInAgainIfRejected } from "../../../lib/access.ts";
-import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../lib/dashboard.ts";
-import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../lib/format.ts";
-import { Badge, ErrorCard, PageToolbar, cn } from "../../../components/ui.tsx";
-import { RecordingPlayer } from "../../../components/recording-player.tsx";
+import { requireAccess, signInAgainIfRejected } from "../../../../lib/access.ts";
+import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../../lib/dashboard.ts";
+import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../../lib/format.ts";
+import { Badge, ErrorCard, PageToolbar, cn } from "../../../../components/ui.tsx";
+import { RecordingPlayer } from "../../../../components/recording-player.tsx";
 
 export const dynamic = "force-dynamic";
 

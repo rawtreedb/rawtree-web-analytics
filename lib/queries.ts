@@ -1,7 +1,7 @@
 // Every dashboard query, as SQL text only (lib/dashboard.ts runs them). To tune a widget,
 // edit its template below: the doc comment names the widget, and the SQL aliases are the
 // field names the page reads. When you add or rename an alias, update that query's row type
-// (the run<{...}> call in lib/dashboard.ts) and its use in app/page.tsx.
+// (the run<{...}> call in lib/dashboard.ts) and its use in app/(dashboard)/page.tsx.
 //
 // Rules every query keeps:
 // - Delivery is at least once, so the same event_id can be stored twice. Count events with

@@ -105,10 +105,10 @@ export function ConsoleApp({ database }: { database: string }) {
     startConsole();
     return stopConsole;
   }, []);
-  // With two columns (@5xl) the console fills the viewport (main's padding is p-4 lg:p-6):
+  // With two columns (@5xl, always at lg) the console fills the viewport (main's padding is pt-3 lg:pb-6):
   // toolbar and consent stay put, the controls column and the event table scroll on their own.
   return (
-    <div className="flex w-full flex-col @5xl:h-[calc(100dvh-3rem)]">
+    <div className="flex w-full flex-col @5xl:h-[calc(100dvh-2.25rem)]">
       <PageToolbar
         title="Console"
         badges={<Badge variant="warning">Test events</Badge>}

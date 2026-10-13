@@ -63,7 +63,7 @@ function useActiveSection(enabled: boolean) {
 }
 
 const itemClass =
-  "flex min-h-9 items-center gap-2.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground aria-[current=page]:bg-primary/10 aria-[current=page]:text-primary max-md:justify-center";
+  "flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-foreground max-md:justify-center";
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -90,7 +90,7 @@ export function SidebarNav() {
                   "block rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground max-md:whitespace-nowrap",
                   // The active marker sits on the list's left border: pl-2 plus the 1px border.
                   active === id &&
-                    "relative font-semibold text-foreground before:absolute before:inset-y-1.5 before:-left-2.25 before:w-0.5 before:rounded-xs before:bg-primary max-md:bg-muted max-md:before:hidden",
+                    "relative font-semibold text-foreground before:absolute before:inset-y-1.5 before:-left-2.25 before:w-0.5 before:rounded-xs before:bg-sidebar-foreground max-md:bg-muted max-md:before:hidden",
                 )}
                 href={`#${id}`}
               >

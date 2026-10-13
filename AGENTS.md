@@ -10,8 +10,8 @@ Keep it simple. The project is only: an SDK to send events, examples, and a dash
 
 - `packages/analytics/`: the publishable SDK (`@rawtree/analytics`). `src/protocol.ts` is the event contract; its types and validator are the source of truth for the SDK and the collector.
 - `app/api/collect/route.ts` + `lib/collect.ts`, `lib/rawtree.ts`: the Next.js collector.
-- `lib/queries.ts`: every dashboard SQL query (one documented template per widget; aliases are the fields `app/page.tsx` reads). `lib/dashboard.ts` runs them; pages import only `lib/dashboard.ts`. Bot detection lives in `lib/crawlers.ts`, date ranges in `lib/range.ts`.
-- `app/console/` + `components/console/`: the test console page (`/console`). It sends through the workspace SDK to `app/api/console/collect` (same `handleCollect`, with the visitor's `access.ingest`); `app/api/console/server-event` runs the server SDK in-process and `app/api/console/stored` is the storage check (`access.query`).
+- `lib/queries.ts`: every dashboard SQL query (one documented template per widget; aliases are the fields `app/(dashboard)/page.tsx` reads). `lib/dashboard.ts` runs them; pages import only `lib/dashboard.ts`. Bot detection lives in `lib/crawlers.ts`, date ranges in `lib/range.ts`.
+- `app/(dashboard)/console/` + `components/console/`: the test console page (`/console`). It sends through the workspace SDK to `app/api/console/collect` (same `handleCollect`, with the visitor's `access.ingest`); `app/api/console/server-event` runs the server SDK in-process and `app/api/console/stored` is the storage check (`access.query`).
 - `examples/recipes/`: tracking recipes (`RECIPES.md` + `.ts` modules), typechecked by `npm run typecheck`.
 - `test/`: collector tests.
 
