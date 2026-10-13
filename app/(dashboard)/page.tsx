@@ -3,13 +3,13 @@
 // Treewatcher's growth dashboard. All SQL lives in lib/queries.ts (run by getDashboard);
 // this page only shapes rows for display. Every count is deduplicated by ID in SQL.
 
-import { requireAccess, signInAgainIfRejected } from "../lib/access.ts";
-import { getDashboard, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../lib/dashboard.ts";
-import { summarizeCrawlers } from "../lib/crawlers.ts";
-import { DAY_MS, previousRange, resolveRange, toUtcDay, type ResolvedRange, type SearchParams } from "../lib/range.ts";
-import { formatValue, ratio, relativeChange } from "../lib/format.ts";
-import { DateFilter } from "../components/date/date-filter.tsx";
-import { DataTableCard, DonutChart, MetricChartCard, StatCard, type ChartRow } from "../components/charts.tsx";
+import { requireAccess, signInAgainIfRejected } from "../../lib/access.ts";
+import { getDashboard, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../../lib/dashboard.ts";
+import { summarizeCrawlers } from "../../lib/crawlers.ts";
+import { DAY_MS, previousRange, resolveRange, toUtcDay, type ResolvedRange, type SearchParams } from "../../lib/range.ts";
+import { formatValue, ratio, relativeChange } from "../../lib/format.ts";
+import { DateFilter } from "../../components/date/date-filter.tsx";
+import { DataTableCard, DonutChart, MetricChartCard, StatCard, type ChartRow } from "../../components/charts.tsx";
 import {
   Badge,
   BarListCard,
@@ -23,7 +23,7 @@ import {
   StatGrid,
   chartColors,
   crawlerCategoryColors,
-} from "../components/ui.tsx";
+} from "../../components/ui.tsx";
 
 export const dynamic = "force-dynamic";
 

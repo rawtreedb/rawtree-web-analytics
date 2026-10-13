@@ -446,8 +446,8 @@ export function SegmentedLinks({ label, items }: { label: string; items: readonl
 }
 
 /**
- * Sticky page header with the title, meta line, and filters. It bleeds to the main
- * area's edges with negative margins that mirror the shell's `p-4 lg:p-6` padding.
+ * Sticky page header card with the title, meta line, and filters. It sticks at the
+ * sidebar card's top offset; the strip above it hides content scrolling through the gap.
  */
 export function PageToolbar({
   title,
@@ -463,7 +463,7 @@ export function PageToolbar({
   back?: { href: string; label: string };
 }) {
   return (
-    <header className="sticky top-0 z-20 -mx-4 -mt-4 mb-6 flex min-h-19 flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b bg-background-extra/85 px-4 py-3 backdrop-blur-md backdrop-saturate-150 lg:-mx-6 lg:-mt-6 lg:px-6">
+    <header className="sticky top-3 z-20 mb-4 flex min-h-19 flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl bg-card px-5 py-3 shadow-soft ring-1 ring-foreground/10 before:absolute before:inset-x-0 before:-top-3 before:h-3 before:bg-background-extra">
       <div className="grid min-w-0 grow basis-72 gap-1">
         {back ? (
           <Link className="inline-flex w-fit items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary" href={back.href}>

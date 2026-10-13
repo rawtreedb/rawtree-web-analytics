@@ -85,7 +85,7 @@ Everything you send goes to the database you're signed in to (or `RAWTREE_DATABA
 - **Humans only:** once events carry a user agent, every section except Bots excludes them. Before that, the sections show an "All traffic" badge.
 - **Sections:** Overview has the headline numbers. Traffic has the daily trend and breakdown. Acquisition shows channels, referrers, and UTM campaigns by each session's first touch. Content lists top pages. Engagement covers time on page, scroll depth, and CTA clicks. Bots shows bot page requests, crawler types, top crawlers, and the most crawled paths.
 - **Recordings:** pick a session from the list on the left and replay it. Pause, seek, and change speed from the controls under the player. Incomplete recordings replay only their complete stretches and say what was skipped.
-- **Tune a widget:** every dashboard query lives in [`lib/queries.ts`](lib/queries.ts), one documented template per widget. Edit the SQL there (for example add a channel host to `SEARCH_HOSTS` or change `ENGAGED_MS`). The aliases are the field names the page reads: if you add or rename one, update that query's row type in `lib/dashboard.ts` and its use in `app/page.tsx`.
+- **Tune a widget:** every dashboard query lives in [`lib/queries.ts`](lib/queries.ts), one documented template per widget. Edit the SQL there (for example add a channel host to `SEARCH_HOSTS` or change `ENGAGED_MS`). The aliases are the field names the page reads: if you add or rename one, update that query's row type in `lib/dashboard.ts` and its use in `app/(dashboard)/page.tsx`.
 
 ## ☁️ Deploy the dashboard
 
