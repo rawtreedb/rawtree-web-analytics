@@ -6,8 +6,8 @@ import { IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
 import { pickWorkspace } from "../../app/sign-in/actions.ts";
 import type { Workspace } from "../../lib/rawtree-connect.ts";
+import { SearchSelect } from "./search-select.tsx";
 
-const select = "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:border-primary";
 const DEFAULT_DATABASE = "web_analytics";
 
 export function WorkspacePicker({ workspaces, buttonClass }: { workspaces: Workspace[]; buttonClass: string }) {
@@ -37,37 +37,24 @@ export function WorkspacePicker({ workspaces, buttonClass }: { workspaces: Works
 
   return (
     <form action={pickWorkspace} className="grid gap-4">
-      <label className="grid gap-1.5 text-sm font-medium">
-        Organization
-        <select
-          className={select}
-          onChange={(event) => {
-            setOrganization(event.target.value);
-            chooseCluster(usable.find((w) => w.organization === event.target.value));
-          }}
-          value={organization}
-        >
-          {organizations.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1.5 text-sm font-medium">
-        Cluster
-        <select className={select} onChange={(event) => chooseCluster(clusters.find((w) => w.cluster === event.target.value))} value={cluster}>
-          {clusters.map((w) => (
-            <option key={w.cluster}>{w.cluster}</option>
-          ))}
-        </select>
-      </label>
-      <label className="grid gap-1.5 text-sm font-medium">
-        Database
-        <select className={select} onChange={(event) => setDatabase(event.target.value)} value={database}>
-          {databases.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </select>
-      </label>
+      <SearchSelect
+        items={organizations}
+        label="Organization"
+        onValueChange={(name) => {
+          setOrganization(name);
+          chooseCluster(usable.find((w) => w.organization === name));
+        }}
+        placeholder="Select an organization"
+        value={organization}
+      />
+      <SearchSelect
+        items={clusters.map((w) => w.cluster)}
+        label="Cluster"
+        onValueChange={(name) => chooseCluster(clusters.find((w) => w.cluster === name))}
+        placeholder="Select a cluster"
+        value={cluster}
+      />
+      <SearchSelect items={databases} label="Database" onValueChange={setDatabase} placeholder="Select a database" value={database} />
       <input name="workspace" type="hidden" value={JSON.stringify({ organization, cluster, database })} />
       <button className={`${buttonClass} justify-self-end`} disabled={!database} type="submit">
         Load dashboard <IconChevronRight className="size-4" />
