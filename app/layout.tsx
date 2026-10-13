@@ -13,9 +13,15 @@ import { SidebarNav } from "../components/sidebar-nav.tsx";
 import { getAccess } from "../lib/access.ts";
 import { signOut } from "./sign-in/actions.ts";
 
+const title = "RawTree Web Analytics";
+const description = "Dashboard and replay for the events collected by @rawtree/analytics.";
+
+// app/opengraph-image.png supplies og:image; on Vercel, Next resolves it against the production domain.
 export const metadata: Metadata = {
-  title: "RawTree Web Analytics",
-  description: "Dashboard and replay for the events collected by @rawtree/analytics.",
+  title,
+  description,
+  openGraph: { title, description, siteName: "RawTree", type: "website" },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
