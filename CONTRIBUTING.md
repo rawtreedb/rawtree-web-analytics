@@ -17,8 +17,8 @@ npm run dev                  # http://localhost:3000
 ## Before opening a pull request
 
 ```sh
-npm run typecheck
-npm test
+npm run typecheck   # also typechecks the recipes in examples/recipes/
+npm test            # offline: RawTree is mocked
 npm run build
 ```
 
@@ -28,15 +28,16 @@ CI runs the same three checks on every pull request. Every pull request also get
 
 - **Keep pull requests small and focused**, with a test plan and screenshots for UI changes.
 - **The event contract is `packages/analytics/src/protocol.ts`.** Keep it backward compatible: existing events must keep validating and storing the same way.
-- **Dashboard SQL lives in `lib/queries.ts`.** Count each event once (`uniqExact(toString(event_id))` or `LIMIT 1 BY`), never `count()` over raw rows. Add new counting queries to `EVENT_QUERIES` so the dedup test covers them.
-- **Never accept SQL or table names from the browser.** Credentials and destinations come from server configuration or the signed-in viewer's access (`lib/access.ts`).
-- **Tests never write to real tables.** Use temporary tables with `RAWTREE_TABLE_PREFIX` and drop them afterwards.
-- **The browser SDK stays free of rrweb** (`./recorder` is a separate entry) and the server entry free of browser globals. `packages/analytics/test/entries.test.ts` checks this.
+- **Dashboard SQL lives in `lib/queries.ts`** and follows the [query rules](README.md#-ask-your-ai-agent): count each event once (`uniqExact(toString(event_id))` or `LIMIT 1 BY`), never `count()` over raw rows. Add new counting queries to `EVENT_QUERIES` so the dedup test covers them. The README's [add a widget](README.md#-customize-it) steps cover the rest.
+- **The collector acknowledges only after RawTree accepted every row.** Keep event and chunk IDs stable across retries.
+- **Never accept SQL or table names from the browser.** Credentials and destinations come from server configuration or the signed-in visitor's access (`lib/access.ts`).
+- **Tests stay offline.** Mock `fetch` instead of calling RawTree. For a manual run against real RawTree, set `RAWTREE_TABLE_PREFIX` (e.g. `e2e_`) to use disposable tables, and drop them afterwards.
+- **RawTree reads lag writes** by a fraction of a second, and replicas can briefly disagree. Poll, and never assume read-after-write.
+- **The browser SDK stays free of rrweb** (`./recorder` is a separate entry): `packages/analytics/test/entries.test.ts` checks it. **The server entry stays free of browser globals:** `server.test.ts` checks it.
 - **Node runs the `.ts` sources directly:** erasable TypeScript only (no enums, namespaces, or parameter properties) and `.ts` extensions in relative imports.
 - **Next.js 16 differs from older versions.** Check `node_modules/next/dist/docs/` before using its APIs.
+- **Configuration changes** go in `.env.example` too. Secrets live only in `.env.local`.
 - **No secrets, keys, or private event data** in code, issues, or pull requests.
-
-[AGENTS.md](AGENTS.md) has the same rules in more detail, for people and coding agents.
 
 ## Releasing the SDK (maintainers)
 

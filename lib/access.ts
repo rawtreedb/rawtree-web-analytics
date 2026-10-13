@@ -1,6 +1,6 @@
 // Who may read and write which RawTree database for the current request.
-// - Env mode: RAWTREE_QUERY_KEY and RAWTREE_INGEST_KEY are set. No sign-in, no Connect.
-// - Sign-in mode: otherwise. The visitor brings an API key (cookie) or a Vercel Connect
+// - Env mode: RAWTREE_QUERY_KEY and RAWTREE_INGEST_KEY are both set. No sign-in, no Connect.
+// - Sign-in mode: otherwise (usually: RAWTREE_QUERY_KEY unset). The visitor brings an API key (cookie) or a Vercel Connect
 //   grant (opaque session cookie plus the picked organization / cluster / database).
 // The API URL and table prefix always come from the environment; the browser picks at most
 // a database it can access, never SQL or table names.
@@ -14,7 +14,8 @@ export type Access = {
   mode: "env" | "key" | "connect";
   /** Reads: dashboard, recordings, console storage checks. */
   query: RawTreeConfig;
-  /** Inserts: the console collect route (and /api/collect only in env mode). */
+  /** Inserts from the test console (/api/console/*). /api/collect never uses Access: it always
+   *  writes with RAWTREE_INGEST_KEY and RAWTREE_DATABASE (lib/collect.ts). */
   ingest: RawTreeConfig;
   /** Shown in the UI, e.g. "web_analytics" or "rawtree / internal_projects / web_analytics". */
   label: string;

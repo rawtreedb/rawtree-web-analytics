@@ -1,11 +1,11 @@
 // The dashboard: Overview, Traffic, Acquisition, Content, Engagement, and Bots for one
-// date range, compared with the previous period of equal length. Layout and cards follow
-// Treewatcher's growth dashboard. All SQL lives in lib/queries.ts (run by getDashboard);
-// this page only shapes rows for display. Every count is deduplicated by ID in SQL.
+// date range, compared with the previous period of equal length. All SQL lives in
+// lib/queries.ts (run by getDashboard); this page only shapes rows for display. Every count
+// is deduplicated by ID in SQL.
 
 import { requireAccess, signInAgainIfRejected } from "../../lib/access.ts";
-import { getDashboard, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../../lib/dashboard.ts";
-import { summarizeCrawlers } from "../../lib/crawlers.ts";
+import { ENGAGED_MS, getDashboard, QUICK_EXIT_MS, queryErrorMessage, type DashboardData, type DayRow, type Totals } from "../../lib/dashboard.ts";
+import { summarizeCrawlers, type CrawlerCategory } from "../../lib/crawlers.ts";
 import { DAY_MS, previousRange, resolveRange, toUtcDay, type ResolvedRange, type SearchParams } from "../../lib/range.ts";
 import { formatValue, ratio, relativeChange } from "../../lib/format.ts";
 import { DateFilter } from "../../components/date/date-filter.tsx";
@@ -22,7 +22,6 @@ import {
   PageToolbar,
   StatGrid,
   chartColors,
-  crawlerCategoryColors,
 } from "../../components/ui.tsx";
 
 export const dynamic = "force-dynamic";
@@ -31,9 +30,20 @@ const instant = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", 
 const formatWindow = ({ fromMs, toMs }: { fromMs: number; toMs: number }) => `${instant.format(fromMs)} – ${instant.format(toMs)} UTC`;
 const pointChange = (a: number | null, b: number | null) => (a === null || b === null ? null : a - b);
 const pagesPerSession = (totals: Totals) => ratio(totals.pageViews, totals.sessions);
-// Bots are counted in page requests, like Treewatcher: page_view events from bot user agents.
+// Bots are counted in page requests: page_view events from bot user agents.
 const botShare = (totals: Totals) => ratio(totals.botPageViews, totals.botPageViews + totals.pageViews);
 const botsPerHuman = (totals: Totals) => ratio(totals.botPageViews, totals.pageViews);
+
+/** Fixed per crawler type so the donut and tables use the same color in every window. */
+const crawlerCategoryColors: Record<CrawlerCategory, string> = {
+  "AI retrieval": "var(--chart-cat-1)",
+  "AI training": "var(--chart-cat-6)",
+  "Search indexer": "var(--chart-cat-2)",
+  "Social preview": "var(--chart-cat-3)",
+  "SEO tool": "var(--chart-cat-5)",
+  "Script or headless": "var(--chart-cat-4)",
+  Other: "var(--chart-muted)",
+};
 
 /** Headline totals: humans only, or all traffic while no user agent is stored. */
 function shownTotals(totals: Totals, hasUserAgent: boolean): Totals {
@@ -378,8 +388,8 @@ function EngagementSection({ data, scope }: { data: DashboardData; scope: React.
       <StatGrid>
         <StatCard format="duration" info="Half of measured page views end sooner than this." label="Median time on page" value={views ? totals.medianMs : null} />
         <StatCard format="duration" info="A quarter of measured page views last longer than this." label="75th percentile time" value={views ? totals.p75Ms : null} />
-        <StatCard format="percent" info="Share of measured page views lasting at least 10 seconds." label="Engaged views" value={ratio(totals.engagedViews, views)} />
-        <StatCard format="percent" info="Share of measured page views left within 5 seconds." label="Quick exits" value={ratio(totals.quickExits, views)} />
+        <StatCard format="percent" info={`Share of measured page views lasting at least ${ENGAGED_MS / 1000} seconds.`} label="Engaged views" value={ratio(totals.engagedViews, views)} />
+        <StatCard format="percent" info={`Share of measured page views left within ${QUICK_EXIT_MS / 1000} seconds.`} label="Quick exits" value={ratio(totals.quickExits, views)} />
         <StatCard info="Page views with a time_on_page event." label="Measured views" value={views} />
       </StatGrid>
       <DashboardGrid>

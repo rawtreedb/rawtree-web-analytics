@@ -202,7 +202,7 @@ describe("resolveRange", () => {
   });
 
   it("falls back to the last 7 days on missing or invalid params", () => {
-    for (const params of [{}, { range: "bogus" }, { range: "custom", start: "nope", end: "2026-10-08T00:00:00Z" }, { range: "custom", start: "2026-10-08T00:00:00Z", end: "2026-10-01T00:00:00Z" }]) {
+    for (const params of [{}, { range: "bogus" }, { range: "toString" }, { range: "custom", start: "nope", end: "2026-10-08T00:00:00Z" }, { range: "custom", start: "2026-10-08T00:00:00Z", end: "2026-10-01T00:00:00Z" }]) {
       assert.equal(resolveRange(params, now).key, "last_7_days");
     }
   });

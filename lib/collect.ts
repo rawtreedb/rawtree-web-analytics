@@ -41,7 +41,17 @@ function tokenMatches(header: string, expected: string): boolean {
   return timingSafeEqual(digest(header), digest(`Bearer ${expected}`));
 }
 
-async function readBody(request: Request, maxBytes: number): Promise<string | undefined> {
+/** JSON.parse that returns undefined instead of throwing. */
+export function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The body as text, or undefined when it is larger than maxBytes (declared or streamed). */
+export async function readBody(request: Request, maxBytes: number): Promise<string | undefined> {
   const declared = Number(request.headers.get("content-length") ?? "0");
   if (declared > maxBytes) return undefined;
   if (!request.body) return "";

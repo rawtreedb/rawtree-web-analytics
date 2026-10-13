@@ -3,6 +3,12 @@
 // field names the page reads. When you add or rename an alias, update that query's row type
 // (the run<{...}> call in lib/dashboard.ts) and its use in app/(dashboard)/page.tsx.
 //
+// To add a widget: write its template here, reading FROM ${events(s)} (not s.table) so missing
+// columns read as NULL. Add it to EVENT_QUERIES if it counts events (the dedup test runs each
+// one), and add every new column it reads (e.g. properties.plan) to OPTIONAL_COLUMNS, so a
+// young table without that column doesn't fail the whole dashboard. Then run it in
+// lib/dashboard.ts and render it in app/(dashboard)/page.tsx.
+//
 // Rules every query keeps:
 // - Delivery is at least once, so the same event_id can be stored twice. Count events with
 //   uniqExact(toString(event_id)) (or uniqExact on a session, page view, or chunk ID), never
@@ -170,8 +176,8 @@ LIMIT 50`;
 // --- Engagement -------------------------------------------------------------------
 
 /** A page view counts as engaged from this long on the page, and as a quick exit below QUICK_EXIT_MS. */
-const ENGAGED_MS = 10_000;
-const QUICK_EXIT_MS = 5_000;
+export const ENGAGED_MS = 10_000;
+export const QUICK_EXIT_MS = 5_000;
 
 /** One row per human page view (deduplicated by page_view_id): pv, its path, and `measure` over its `event` rows. */
 const perPageView = (s: Scope, event: string, measure: string) => `SELECT

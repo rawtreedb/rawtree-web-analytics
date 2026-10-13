@@ -8,7 +8,8 @@ import { IconPlayerPauseFilled, IconPlayerPlayFilled, IconRotate } from "@tabler
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { eventWithTime, Replayer } from "rrweb";
 import { formatValue } from "../lib/format.ts";
-import { SegmentedControl, cn } from "./ui.tsx";
+import { Button } from "./button.tsx";
+import { Notice, SegmentedControl } from "./ui.tsx";
 
 type ReplayResponse = {
   recordingId: string;
@@ -68,9 +69,6 @@ function Timeline({ replayerRef, playing, total }: { replayerRef: RefObject<Repl
     </>
   );
 }
-
-const iconButton =
-  "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:ring-3 focus-visible:ring-ring/50 outline-none [&_svg]:size-4";
 
 export function RecordingPlayer({ recordingId }: { recordingId: string }) {
   const [data, setData] = useState<ReplayResponse | undefined>(undefined);
@@ -182,46 +180,46 @@ export function RecordingPlayer({ recordingId }: { recordingId: string }) {
 
   if (error) {
     return (
-      <p className="rounded-xl bg-[var(--badge-error-bg)] px-4 py-3 text-sm text-[var(--badge-error-fg)]" data-testid="player-error">
+      <Notice data-testid="player-error" variant="error">
         {error}
-      </p>
+      </Notice>
     );
   }
   if (!data) {
-    return <div className="w-full animate-pulse rounded-xl bg-muted max-lg:aspect-video lg:flex-1" aria-label="Loading recording" />;
+    return <div className="w-full animate-pulse rounded-xl bg-muted @max-4xl:aspect-video @4xl:flex-1" aria-label="Loading recording" />;
   }
   if (data.segments.length === 0) {
     return (
-      <p className="rounded-xl bg-[var(--badge-warning-bg)] px-4 py-3 text-sm text-[var(--badge-warning-fg)]" data-testid="player-unreplayable">
+      <Notice data-testid="player-unreplayable" variant="warning">
         Nothing to replay: no complete full snapshot survived. {data.gaps.join(". ")}
-      </p>
+      </Notice>
     );
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {data.gaps.length > 0 || data.truncated ? (
-        <p className="rounded-xl bg-[var(--badge-warning-bg)] px-4 py-2 text-xs text-[var(--badge-warning-fg)]" data-testid="player-gaps">
+        <Notice className="py-2 text-xs" data-testid="player-gaps" variant="warning">
           {data.truncated ? "Only the first part of a long recording is loaded. " : ""}
           {data.gaps.length > 0
             ? `Skipped: ${data.gaps.slice(0, 3).join(". ")}${data.gaps.length > 3 ? `, and ${data.gaps.length - 3} more gaps` : ""}.`
             : ""}
-        </p>
+        </Notice>
       ) : null}
 
       <div
-        className="relative w-full overflow-hidden rounded-xl border bg-muted max-lg:aspect-video lg:min-h-0 lg:flex-1"
+        className="relative w-full overflow-hidden rounded-xl border bg-muted @max-4xl:aspect-video @4xl:min-h-0 @4xl:flex-1"
         data-testid="replayer"
         ref={stageRef}
       />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <button aria-label={playing ? "Pause" : "Play"} className={cn(iconButton, "bg-primary text-primary-foreground hover:bg-primary/85")} onClick={togglePlay} type="button">
+        <Button aria-label={playing ? "Pause" : "Play"} onClick={togglePlay} size="icon">
           {playing ? <IconPlayerPauseFilled /> : <IconPlayerPlayFilled />}
-        </button>
-        <button aria-label="Restart" className={cn(iconButton, "border bg-card text-muted-foreground shadow-soft hover:text-foreground")} onClick={restart} type="button">
+        </Button>
+        <Button aria-label="Restart" className="text-muted-foreground shadow-soft" onClick={restart} size="icon" variant="outline">
           <IconRotate />
-        </button>
+        </Button>
         <Timeline playing={playing} replayerRef={replayerRef} total={total} />
         <SegmentedControl
           itemClassName="numeric px-2.5"

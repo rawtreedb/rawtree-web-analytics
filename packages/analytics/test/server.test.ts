@@ -33,3 +33,16 @@ it("rejects invalid events before sending and surfaces collector rejections", as
   await assert.rejects(analytics.sendEvent("ok"), /HTTP 400/);
   assert.equal(calls.length, 1);
 });
+
+it("sanitizes pageUrl like the browser client", async () => {
+  const { calls, fetch } = collector([]);
+  const analytics = createServerAnalytics({ endpoint: "https://c.example/api/collect", token: "secret", fetch });
+  await analytics.sendEvent("ok", {}, { pageUrl: "https://u:p@example.com/a?token=x&utm_source=hn#h" });
+  assert.equal((calls[0].body.events[0] as { page_url?: string }).page_url, "https://example.com/a?utm_source=hn");
+});
+
+it("still rejects a relative pageUrl", async () => {
+  const { fetch } = collector([]);
+  const analytics = createServerAnalytics({ endpoint: "https://c.example/api/collect", token: "secret", fetch });
+  await assert.rejects(analytics.sendEvent("ok", {}, { pageUrl: "/pricing" }), /page_url/);
+});

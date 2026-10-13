@@ -1,10 +1,9 @@
-// Server-safe dashboard primitives, trimmed from Treewatcher's components/ui (card,
-// dashboard, delta, bar-list, page-toolbar, segmented-control) and styled with the
-// rawtree-platform tokens. Each primitive bakes in its final classes; `cn` also resolves
-// conflicting Tailwind utilities so overrides win (needed by the date picker's Button).
+// Server-safe dashboard primitives: card, notice, section and grid layout, delta, bar list,
+// segmented controls, and the page toolbar. Each primitive bakes in its final classes; `cn`
+// also resolves conflicting Tailwind utilities so a `className` override wins.
+import { IconExternalLink, IconInfoCircle } from "@tabler/icons-react";
 import Link from "next/link";
 import type { ComponentProps, CSSProperties, ReactNode } from "react";
-import type { CrawlerCategory } from "../lib/crawlers.ts";
 import { twMerge } from "tailwind-merge";
 import { formatValue, type ValueFormat } from "../lib/format.ts";
 import { Tooltip } from "./tooltip.tsx";
@@ -13,11 +12,24 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
   return twMerge(classes);
 }
 
+// --- Shared class names ---------------------------------------------------------------
+
+/** The card frame used by every panel: dashboard cards, the toolbar, the sidebar, sign-in panels. */
+export const cardClass = "rounded-2xl bg-card text-card-foreground shadow-soft ring-1 ring-foreground/10";
+
+/** The one keyboard focus ring, shared by buttons, inputs, links, and segmented controls. */
+export const focusRing = "outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
+
+/** Text inputs and select triggers; set the height and width where they are used. */
+export const inputClass = cn("rounded-lg border bg-background px-3 text-sm focus-visible:border-ring", focusRing);
+
+/** Inline code and IDs inside running text. */
+export const codeClass = "rounded bg-muted px-1 py-0.5 font-mono text-xs";
+
 // --- Palette (CSS variables in app/globals.css, so charts follow the theme) ---------
 
 export const chartColors = {
   primary: "var(--chart-primary)",
-  comparison: "var(--chart-comparison)",
   success: "var(--chart-success)",
   info: "var(--chart-info)",
   muted: "var(--chart-muted)",
@@ -33,34 +45,23 @@ export const categoricalColors = [
   "var(--chart-cat-7)",
 ] as const;
 
-/** Fixed per crawler type so the donut and tables use the same color in every window. */
-export const crawlerCategoryColors: Record<CrawlerCategory, string> = {
-  "AI retrieval": "var(--chart-cat-1)",
-  "AI training": "var(--chart-cat-6)",
-  "Search indexer": "var(--chart-cat-2)",
-  "Social preview": "var(--chart-cat-3)",
-  "SEO tool": "var(--chart-cat-5)",
-  "Script or headless": "var(--chart-cat-4)",
-  Other: "var(--chart-muted)",
-};
-
 // --- Badge and card -------------------------------------------------------------
 
 type BadgeVariant = "success" | "error" | "warning" | "info" | "purple" | "secondary";
 
 const badgeVariants: Record<BadgeVariant, string> = {
-  info: "bg-[var(--badge-info-bg)] text-[var(--badge-info-fg)] border-[var(--badge-info-border)]",
-  purple: "bg-[var(--badge-purple-bg)] text-[var(--badge-purple-fg)] border-[var(--badge-purple-border)]",
-  warning: "bg-[var(--badge-warning-bg)] text-[var(--badge-warning-fg)] border-[var(--badge-warning-border)]",
-  success: "bg-[var(--badge-success-bg)] text-[var(--badge-success-fg)] border-[var(--badge-success-border)]",
-  error: "bg-[var(--badge-error-bg)] text-[var(--badge-error-fg)] border-[var(--badge-error-border)]",
+  info: "border-badge-info-fg/20 bg-badge-info-bg text-badge-info-fg",
+  purple: "border-badge-purple-fg/20 bg-badge-purple-bg text-badge-purple-fg",
+  warning: "border-badge-warning-fg/20 bg-badge-warning-bg text-badge-warning-fg",
+  success: "border-badge-success-fg/20 bg-badge-success-bg text-badge-success-fg",
+  error: "border-badge-error-fg/20 bg-badge-error-bg text-badge-error-fg",
   secondary: "border-border bg-secondary text-muted-foreground",
 };
 
 export function Badge({ variant = "secondary", className, ...props }: ComponentProps<"span"> & { variant?: BadgeVariant }) {
   return (
     <span
-      className={cn("inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-4xl border px-2 py-0.5 text-xs font-medium whitespace-nowrap", badgeVariants[variant], className)}
+      className={cn("inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap", badgeVariants[variant], className)}
       {...props}
     />
   );
@@ -70,13 +71,10 @@ export function Badge({ variant = "secondary", className, ...props }: ComponentP
 export function InfoTip({ children }: { children: string }) {
   return (
     <Tooltip
-      className="inline-grid size-4.5 flex-none cursor-help place-items-center rounded-full text-extra-muted-foreground outline-none hover:text-primary focus-visible:text-primary focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn("inline-grid size-4.5 flex-none cursor-help place-items-center rounded-full text-extra-muted-foreground hover:text-primary focus-visible:text-primary", focusRing)}
       content={children}
     >
-      <svg aria-label="More info" className="size-4" fill="none" role="img" viewBox="0 0 16 16">
-        <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M8 7.25v3.5M8 5.25h.01" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
-      </svg>
+      <IconInfoCircle aria-label="More info" className="size-4" role="img" stroke={1.5} />
     </Tooltip>
   );
 }
@@ -100,7 +98,7 @@ export function DashboardCard({
   className?: string;
 }) {
   return (
-    <div className={cn("flex h-full min-h-0 flex-col overflow-hidden rounded-2xl bg-card text-sm text-card-foreground shadow-soft ring-1 ring-foreground/10", className)}>
+    <div className={cn(cardClass, "flex h-full min-h-0 flex-col overflow-hidden text-sm", className)}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 px-5 pt-4.5">
         <div className="min-w-0">
           <h3 className="mb-0.5 flex items-center gap-1.5 text-base font-semibold">
@@ -128,13 +126,34 @@ export function CardEmpty({ className, ...props }: ComponentProps<"p">) {
   );
 }
 
+const noticeVariants = {
+  error: "border-badge-error-fg/20 bg-badge-error-bg text-badge-error-fg",
+  warning: "border-badge-warning-fg/20 bg-badge-warning-bg text-badge-warning-fg",
+  neutral: "bg-muted",
+} as const;
+
+/** Tinted message box for errors, warnings, and neutral notes. */
+export function Notice({ variant = "neutral", className, ...props }: ComponentProps<"p"> & { variant?: keyof typeof noticeVariants }) {
+  return <p className={cn("m-0 rounded-xl border border-transparent px-4 py-3 text-sm", noticeVariants[variant], className)} {...props} />;
+}
+
 /** Error banner for failed queries. */
 export function ErrorCard({ title = "Queries failed", children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[var(--badge-error-border)] bg-[var(--badge-error-bg)] px-5 py-4 text-sm">
+    <div className="rounded-2xl border border-badge-error-fg/20 bg-badge-error-bg px-5 py-4 text-sm">
       <p className="font-semibold">{title}</p>
       <p className="mt-1 text-muted-foreground">{children}</p>
     </div>
+  );
+}
+
+/** Link that opens in a new tab, marked with an external-link icon. */
+export function ExternalLink({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
+  return (
+    <a className={cn("inline-flex items-center gap-1", className)} href={href} rel="noopener noreferrer" target="_blank">
+      {children}
+      <IconExternalLink aria-hidden className="size-3" />
+    </a>
   );
 }
 
@@ -323,7 +342,7 @@ export function BarList({
             key={[item.label, ...(item.details ?? []).map((detail) => (typeof detail === "string" ? detail : detail.label))].join("\u0000")}
             style={{ "--bar": `${max === 0 ? 0 : (Math.abs(item.value) / max) * 100}%`, ...(item.color ? { "--bar-color": item.color } : {}) } as CSSProperties}
           >
-            <th className="w-full max-w-0 truncate rounded-l-md px-2.5 py-2 text-left font-medium tabular-nums" scope="row" title={item.label}>
+            <th className="w-full max-w-0 truncate rounded-l-md px-2.5 py-2 text-left font-medium" scope="row" title={item.label}>
               {item.label}
             </th>
             {item.details?.map((detail, index) => (
@@ -395,8 +414,10 @@ export function BarListCard({
 // --- Page toolbar ---------------------------------------------------------------------
 
 const segmentGroup = "no-scrollbar inline-flex max-w-full gap-0.5 overflow-x-auto rounded-full bg-muted p-0.5";
-const segmentItem =
-  "inline-flex h-7 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border border-transparent px-3 text-xs font-semibold text-foreground/60 transition-colors hover:text-foreground data-active:border-border data-active:bg-background data-active:text-foreground data-active:shadow-soft";
+const segmentItem = cn(
+  "inline-flex h-7 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border border-transparent px-3 text-xs font-semibold text-foreground/60 transition-colors hover:text-foreground data-active:border-border data-active:bg-background data-active:text-foreground data-active:shadow-soft",
+  focusRing,
+);
 
 /** Pill-shaped single-choice control for switching a view, metric, or playback option. */
 export function SegmentedControl<T extends string>({
@@ -454,25 +475,20 @@ export function PageToolbar({
   badges,
   meta,
   filters,
-  back,
 }: {
   title: ReactNode;
   badges?: ReactNode;
   meta?: ReactNode;
   filters?: ReactNode;
-  back?: { href: string; label: string };
 }) {
   return (
-    <header className="sticky top-3 z-20 mb-4 flex min-h-19 flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl bg-card px-5 py-3 shadow-soft ring-1 ring-foreground/10 before:absolute before:inset-x-0 before:-top-3 before:h-3 before:bg-background-extra">
+    <header
+      className={cn(
+        cardClass,
+        "sticky top-3 z-20 mb-4 flex min-h-19 flex-wrap items-center justify-between gap-x-6 gap-y-3 px-5 py-3 before:absolute before:inset-x-0 before:-top-3 before:h-3 before:bg-background-extra",
+      )}
+    >
       <div className="grid min-w-0 grow basis-72 gap-1">
-        {back ? (
-          <Link className="inline-flex w-fit items-center gap-1 text-xs font-medium text-muted-foreground hover:text-primary" href={back.href}>
-            <svg aria-hidden="true" className="size-3.5" fill="none" viewBox="0 0 16 16">
-              <path d="M10 3.5 5.5 8l4.5 4.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
-            </svg>
-            {back.label}
-          </Link>
-        ) : null}
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="m-0 min-w-0 truncate text-xl font-semibold tracking-tight">{title}</h1>
           {badges}

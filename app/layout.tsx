@@ -4,15 +4,15 @@ import type { Metadata } from "next";
 import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
 import "./globals.css";
+import { SITE } from "../lib/site.ts";
 
-const title = "RawTree Web Analytics";
-const description = "Dashboard and replay for the events collected by @rawtree/analytics.";
+const { name: title, description } = SITE;
 
 // app/opengraph-image.png supplies og:image; on Vercel, Next resolves it against the production domain.
 export const metadata: Metadata = {
   title,
   description,
-  openGraph: { title, description, siteName: "RawTree", type: "website" },
+  openGraph: { title, description, siteName: SITE.shortName, type: "website" },
   twitter: { card: "summary_large_image", title, description },
 };
 

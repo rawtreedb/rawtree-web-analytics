@@ -1,19 +1,20 @@
-// Interactive dashboard pieces (Recharts and tab state), trimmed from Treewatcher's
-// components/charts and components/ui (stat-card, data-table, data-table-card,
-// segmented-control). Annotations, dialogs, and tooltips-as-library are dropped.
+// Interactive dashboard pieces (Recharts and local state): stat cards with sparklines,
+// the donut, the daily metric chart, and the sortable data table.
 "use client";
 
 import { type ReactNode, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ComposedChart, Line, Pie, PieChart, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDay, formatLongDay, formatValue, relativeChange, type ValueFormat } from "../lib/format.ts";
 import { Tooltip as HoverTip } from "./tooltip.tsx";
-import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, SegmentedControl, categoricalColors, chartColors, cn } from "./ui.tsx";
+import { CardEmpty, ChartSwatch, DashboardCard, Delta, InfoTip, SegmentedControl, cardClass, categoricalColors, chartColors, cn, focusRing } from "./ui.tsx";
 
 const previousPeriodInfo = "Change versus the previous period of the same length.";
 // Dotted underline (a border, since text-decoration skips the inline-flex Delta) marks the change as hoverable.
 // Lifted 6px so the underline, not the text baseline, lines up with the bottom of the number beside it
 // (top, not translate: a transform would become the containing block of the fixed tooltip).
-const deltaTrigger = "relative -top-1.5 inline-flex cursor-help border-b border-dotted border-muted-foreground/60 pb-px outline-none hover:border-muted-foreground focus-visible:rounded-xs focus-visible:ring-2 focus-visible:ring-ring";
+const deltaTrigger = cn("relative -top-1.5 inline-flex cursor-help border-b border-dotted border-muted-foreground/60 pb-px hover:border-muted-foreground focus-visible:rounded-xs", focusRing);
+// Axis labels at the --text-2xs size (11px); Recharts takes a number.
+const axisTick = { fill: "var(--muted-foreground)", fontSize: 11 };
 const tooltipClass = "min-w-44 max-w-72 rounded-lg border bg-card px-3 py-2.5 text-xs text-card-foreground shadow-popover";
 
 /** Decorative daily trend for stat cards. */
@@ -63,7 +64,7 @@ export function StatCard({
 }) {
   return (
     <article
-      className="flex min-h-34 flex-col gap-1.5 rounded-2xl bg-card px-4.5 pt-4 pb-4 text-card-foreground shadow-soft ring-1 ring-foreground/10"
+      className={cn(cardClass, "flex min-h-34 flex-col gap-1.5 px-4.5 py-4")}
       data-testid={`stat-${label.toLowerCase().replace(/ /g, "-")}`}
     >
       <header className="flex items-center gap-1">
@@ -147,7 +148,7 @@ export function DonutChart({
       </div>
       <ul className="m-0 grid w-full max-w-104 min-w-0 list-none gap-2 p-0 text-xs md:flex-1">
         {colored.map((slice) => (
-          <li className="flex items-center gap-2 tabular-nums" key={slice.label}>
+          <li className="flex items-center gap-2" key={slice.label}>
             <ChartSwatch color={slice.color} />
             <span className="min-w-0 flex-1 truncate" title={slice.label}>
               {slice.label}
@@ -179,17 +180,14 @@ function TimeSeriesChart({
   label: string;
 }) {
   return (
-    <div
-      className="[&_.recharts-cartesian-axis-tick-value]:font-mono [&_.recharts-cartesian-axis-tick-value]:tracking-tight [&_:focus:not(:focus-visible)]:outline-none"
-      style={{ height: 260 }}
-    >
+    <div className="h-65 [&_.recharts-cartesian-axis-tick-value]:font-mono [&_.recharts-cartesian-axis-tick-value]:tracking-tight [&_:focus:not(:focus-visible)]:outline-none">
       <ComposedChart aria-label={label} data={[...data]} margin={{ top: 16, right: 24, bottom: 0, left: 0 }} responsive style={{ width: "100%", height: "100%" }}>
         <CartesianGrid stroke="var(--border)" strokeDasharray="3 4" vertical={false} />
         <XAxis
           axisLine={false}
           dataKey="day"
           minTickGap={28}
-          tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+          tick={axisTick}
           tickFormatter={(value: string) => formatDay(value)}
           tickLine={false}
           tickMargin={8}
@@ -197,7 +195,7 @@ function TimeSeriesChart({
         <YAxis
           allowDecimals={format === "percent" || format === "decimal"}
           axisLine={false}
-          tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+          tick={axisTick}
           tickFormatter={(value: number) => formatValue(value, format === "number" ? "compact" : format)}
           tickLine={false}
           width="auto"
@@ -220,11 +218,11 @@ function TimeSeriesChart({
                       <dd className="numeric m-0 text-right font-semibold">{formatValue(Number(row[item.key] ?? 0), format)}</dd>
                       {showComparison && item.comparisonKey ? (
                         <>
-                          <dt className="flex items-center gap-1.5 text-extra-muted-foreground">
+                          <dt className="flex items-center gap-1.5 text-muted-foreground">
                             <ChartSwatch color={item.color} variant="dashed" />
                             {typeof row.previousDay === "string" ? formatDay(row.previousDay) : "Previous"}
                           </dt>
-                          <dd className="numeric m-0 text-right font-medium text-extra-muted-foreground">
+                          <dd className="numeric m-0 text-right font-medium text-muted-foreground">
                             {formatValue(Number(row[item.comparisonKey] ?? 0), format)}
                           </dd>
                         </>
@@ -417,7 +415,7 @@ function DataTable({
                   scope="col"
                 >
                   <button
-                    className={cn("eyebrow inline-flex w-full cursor-pointer items-center gap-1 px-3 py-2 text-muted-foreground", isNumeric(column) ? "justify-end" : "justify-start")}
+                    className={cn("eyebrow inline-flex w-full cursor-pointer items-center gap-1 px-3 py-2", focusRing, isNumeric(column) ? "justify-end" : "justify-start")}
                     onClick={() => setSort({ key: column.key, direction: active && sort.direction === "desc" ? "asc" : "desc" })}
                     type="button"
                   >

@@ -21,8 +21,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { type ComponentProps, Fragment, type ReactNode, useEffect, useState } from "react";
-import { Button } from "../date/button.tsx";
-import { Badge, DashboardCard, InfoTip, PageToolbar, cn } from "../ui.tsx";
+import { Button } from "../button.tsx";
+import { Badge, DashboardCard, InfoTip, PageToolbar, cardClass, cn, focusRing, inputClass } from "../ui.tsx";
 import {
   COLLECT_ENDPOINT,
   type Delivery,
@@ -105,10 +105,10 @@ export function ConsoleApp({ database }: { database: string }) {
     startConsole();
     return stopConsole;
   }, []);
-  // With two columns (@5xl, always at lg) the console fills the viewport (main's padding is pt-3 lg:pb-6):
-  // toolbar and consent stay put, the controls column and the event table scroll on their own.
+  // With two columns (@4xl) the console fills the viewport: toolbar and consent stay put,
+  // the controls column and the event table scroll on their own.
   return (
-    <div className="flex w-full flex-col @5xl:h-[calc(100dvh-2.25rem)]">
+    <div className="flex w-full flex-col @4xl:h-main">
       <PageToolbar
         title="Console"
         badges={<Badge variant="warning">Test events</Badge>}
@@ -132,9 +132,9 @@ export function ConsoleApp({ database }: { database: string }) {
       />
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         <ConsentBar database={database} />
-        <div className="grid min-h-0 flex-1 gap-4 @5xl:grid-cols-[400px_minmax(0,1fr)]">
+        <div className="grid min-h-0 flex-1 gap-4 @4xl:grid-cols-aside">
           {/* The scroll container clips what's outside its box; the padding (offset by the negative margin) keeps the cards' ring and shadow visible. */}
-          <div className="grid min-h-0 auto-rows-max content-start gap-4 @5xl:-m-2 @5xl:overflow-y-auto @5xl:overscroll-contain @5xl:p-2">
+          <div className="grid min-h-0 auto-rows-max content-start gap-4 @4xl:-m-2 @4xl:overflow-y-auto @4xl:overscroll-contain @4xl:p-2">
             <BrowserEventsCard />
             <ServerEventsCard />
             <TrafficCard />
@@ -162,13 +162,14 @@ function IdField({ label, value, testId, variant }: { label: string; value?: str
   );
 }
 
-/** On/off switch (native button, styles from rawtree-platform's switch). */
+/** On/off switch as a native button. */
 function Switch({ checked, onCheckedChange, disabled, id }: { checked: boolean; onCheckedChange: (checked: boolean) => void; disabled?: boolean; id: string }) {
   return (
     <button
       aria-checked={checked}
       className={cn(
-        "relative inline-flex h-[18.4px] w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50",
+        "relative inline-flex h-4.5 w-8 shrink-0 cursor-pointer items-center rounded-full border border-transparent transition-all disabled:cursor-not-allowed disabled:opacity-50",
+        focusRing,
         checked ? "bg-primary" : "border-border bg-muted-foreground/30",
       )}
       disabled={disabled}
@@ -177,18 +178,17 @@ function Switch({ checked, onCheckedChange, disabled, id }: { checked: boolean; 
       role="switch"
       type="button"
     >
-      <span className={cn("pointer-events-none block size-4 rounded-full bg-background transition-transform", checked && "translate-x-[calc(100%-2px)]")} />
+      <span className={cn("pointer-events-none block size-4 rounded-full bg-background transition-transform", checked && "translate-x-3.5")} />
     </button>
   );
 }
 
-const inputClass = "rounded-lg border bg-input px-3 outline-none focus-visible:ring-3 focus-visible:ring-ring/50";
 const subhead = "eyebrow flex items-center gap-1.5";
 
 function ConsentBar({ database }: { database: string }) {
   const { consent, recording, identity } = useConsole();
   return (
-    <section aria-label="Consent" className="flex shrink-0 flex-wrap items-center gap-x-8 gap-y-3 rounded-2xl bg-card px-5 py-3 text-sm shadow-soft ring-1 ring-foreground/10">
+    <section aria-label="Consent" className={cn(cardClass, "flex shrink-0 flex-wrap items-center gap-x-8 gap-y-3 px-5 py-3 text-sm")}>
       <div className="flex items-center gap-2 font-semibold">
         <IconShieldCheck className="size-4 -translate-y-px text-muted-foreground" /> Consent
         <span className="text-xs font-normal text-muted-foreground">Nothing is sent until analytics is allowed. Stored in localStorage.</span>
@@ -262,7 +262,7 @@ function BrowserEventsCard() {
         </div>
         <div className="flex flex-col gap-2 border-t pt-4">
           <span className={subhead}>Custom event</span>
-          <input id="custom-name" className={cn(inputClass, "h-9 font-mono text-sm")} value={name} onChange={(event) => setName(event.target.value)} aria-label="Event name" />
+          <input id="custom-name" className={cn(inputClass, "h-9 font-mono")} value={name} onChange={(event) => setName(event.target.value)} aria-label="Event name" />
           <textarea
             id="custom-properties"
             className={cn(inputClass, "min-h-24 py-2 font-mono text-xs")}
@@ -425,7 +425,7 @@ function PlaygroundCard() {
 
         <Step3 title="2. Private content" tip="Each example below must never reach the stored recording. Step 3 checks it.">
           <Example label="Masked input" tip="Inputs are masked: whatever you type is recorded as ****.">
-            <input id="masked-input" value={typed} onChange={(event) => setTyped(event.target.value)} className={cn(inputClass, "h-9 w-full text-sm")} placeholder="Type something, e.g. your name" />
+            <input id="masked-input" value={typed} onChange={(event) => setTyped(event.target.value)} className={cn(inputClass, "h-9 w-full")} placeholder="Type something, e.g. your name" />
           </Example>
           <Example label="Blocked region" tip="Elements with the class rr-block are not recorded at all; the replay shows an empty box of the same size. Use it for areas like billing details.">
             <div className="rr-block rounded-xl border border-dashed p-3 font-mono text-xs">
@@ -609,7 +609,7 @@ function EventViewer() {
   const [openKey, setOpenKey] = useState<string>();
   return (
     <DashboardCard
-      className="max-@5xl:max-h-[80vh]"
+      className="@max-4xl:max-h-160"
       title={cardTitle(<IconCloudUpload className="size-4" />, "Event viewer")}
       description="Newest first. Queued → Sent (collector 200) → Stored (found in RawTree). Click a row for the JSON as sent."
       action={<Badge>{entries.length} rows</Badge>}
@@ -617,12 +617,12 @@ function EventViewer() {
       {/* Fixed layout: column widths never depend on the rows. Status takes the remaining width,
           and below the minimum table width the viewer scrolls horizontally. */}
       <div className="-mx-5 -mb-5 h-full overflow-auto overscroll-contain px-5 pb-5">
-        <table className="w-full min-w-[720px] table-fixed text-xs">
+        <table className="w-full min-w-180 table-fixed text-xs">
           <colgroup>
-            <col className="w-[96px]" />
-            <col className="w-[150px]" />
-            <col className="w-[76px]" />
-            <col className="w-[150px]" />
+            <col className="w-24" />
+            <col className="w-38" />
+            <col className="w-19" />
+            <col className="w-38" />
             <col />
           </colgroup>
           <thead>
@@ -653,7 +653,12 @@ function EventViewer() {
                     data-state={open ? "selected" : undefined}
                     onClick={() => setOpenKey(open ? undefined : entry.key)}
                   >
-                    <td className={cn(cell, "font-mono text-muted-foreground")}>{time(entry.at)}</td>
+                    <td className={cn(cell, "font-mono text-muted-foreground")}>
+                      {/* The row's click handler toggles; this button makes it reachable by keyboard. */}
+                      <button aria-expanded={open} aria-label={`${time(entry.at)}: show the JSON as sent`} className={cn("cursor-pointer rounded-sm", focusRing)} type="button">
+                        {time(entry.at)}
+                      </button>
+                    </td>
                     <EntryCells entry={entry} />
                   </tr>
                   {open && (

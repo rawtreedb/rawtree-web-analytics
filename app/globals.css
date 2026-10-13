@@ -1,85 +1,71 @@
-/* Light-theme tokens copied from rawtree-platform/frontend/src/index.css,
-   plus the Treewatcher dashboard additions (sidebar, charts, shadows, eyebrow, numeric). */
+/* Design tokens. Colors match the RawTree app palette.
+   :root holds the raw values (theme colors, badge colors, chart palette, shadows);
+   @theme inline maps them to Tailwind utilities; the @utility blocks add the few custom
+   utilities the components share (eyebrow, numeric, cell-size-*, grid-cols-*, h-main). */
 @import "tailwindcss";
 
 :root {
-  --badge-info-bg: #e0f5fc;
-  --badge-info-fg: #00a0d2;
-  --badge-pink-bg: #fde7f1;
-  --badge-pink-fg: #e5196e;
-  --badge-purple-bg: #f4e8ff;
-  --badge-purple-fg: #9b30ff;
-  --badge-warning-bg: #fff0e3;
-  --badge-warning-fg: #f5760a;
-  --badge-success-bg: #e8faeb;
-  --badge-success-fg: #1fa63d;
-  --badge-error-bg: #fdecec;
-  --badge-error-fg: #de1616;
-  --badge-info-border: rgb(0 160 210 / 20%);
-  --badge-pink-border: rgb(229 25 110 / 20%);
-  --badge-purple-border: rgb(155 48 255 / 20%);
-  --badge-warning-border: rgb(245 118 10 / 20%);
-  --badge-success-border: rgb(31 166 61 / 20%);
-  --badge-error-border: rgb(222 22 22 / 20%);
-
   --background: oklch(1 0 0);
   --background-extra: oklch(0.971 0.005 274.966);
   --foreground: oklch(0.262 0.058 277.453);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.262 0.058 277.453);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
   --primary: oklch(0.462 0.306 264.176);
-  --primary-foreground: oklch(1 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.262 0.058 277.453);
-  --secondary: oklch(0.971 0.005 274.966);
-  --secondary-foreground: oklch(0.262 0.058 277.453);
-  --muted: oklch(0.971 0.005 274.966);
+  --primary-foreground: var(--background);
+  --secondary: var(--background-extra);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--background-extra);
   --muted-foreground: oklch(0.495 0.04 277.716);
   --extra-muted-foreground: oklch(0.701 0.034 279.609);
-  --accent: oklch(0.971 0.005 274.966);
-  --accent-foreground: oklch(0.262 0.058 277.453);
-  --success: oklch(0.635 0.183 146.068);
+  --accent: var(--background-extra);
+  --accent-foreground: var(--foreground);
+  --success: var(--badge-success-fg);
   --destructive: oklch(0.572 0.226 28.387);
-  --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.935 0.009 279.683);
   --high-contrast-border: oklch(0.829 0.02 279.468);
-  --input: oklch(1 0 0);
-  --ring: oklch(0.462 0.306 264.176);
+  --ring: var(--primary);
   --radius: 0.875rem;
   --scrollbar-thumb: color-mix(in oklab, var(--foreground) 25%, transparent);
   --scrollbar-track: transparent;
 
-  /* Sidebar, chart palette, and shadows from Treewatcher (app/globals.css). */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.262 0.058 277.453);
-  --sidebar-accent: oklch(0.971 0.005 274.966);
-  --sidebar-border: oklch(0.935 0.009 279.683);
+  /* Badge text colors reach WCAG AA (4.5:1) on their background. */
+  --badge-info-bg: #e0f5fc;
+  --badge-info-fg: #00759f;
+  --badge-purple-bg: #f4e8ff;
+  --badge-purple-fg: #9329f3;
+  --badge-warning-bg: #fff0e3;
+  --badge-warning-fg: #b54e00;
+  --badge-success-bg: #e8faeb;
+  --badge-success-fg: #008125;
+  --badge-error-bg: #fdecec;
+  --badge-error-fg: #d71012;
+
   --chart-primary: var(--primary);
-  --chart-comparison: oklch(0.75 0.12 268);
-  --chart-success: oklch(0.696 0.17 162.48);
-  --chart-info: #00a0d2;
+  --chart-success: var(--success);
+  --chart-info: var(--badge-info-fg);
   --chart-muted: var(--extra-muted-foreground);
   --chart-cat-1: var(--primary);
-  --chart-cat-2: oklch(0.696 0.17 162.48);
-  --chart-cat-3: #00a0d2;
+  --chart-cat-2: var(--success);
+  --chart-cat-3: var(--badge-info-fg);
   --chart-cat-4: #e5196e;
-  --chart-cat-5: #f5760a;
-  --chart-cat-6: #9b30ff;
+  --chart-cat-5: var(--badge-warning-fg);
+  --chart-cat-6: var(--badge-purple-fg);
   --chart-cat-7: oklch(0.75 0.12 268);
-  --shadow-soft: 0 1px 2px oklch(0.262 0.058 277.453 / 5%), 0 1px 1px oklch(0.262 0.058 277.453 / 3%);
-  --shadow-popover: 0 12px 32px oklch(0.262 0.058 277.453 / 14%), 0 2px 6px oklch(0.262 0.058 277.453 / 6%);
+
+  --shadow-soft: 0 1px 2px color-mix(in oklab, var(--foreground) 5%, transparent), 0 1px 1px color-mix(in oklab, var(--foreground) 3%, transparent);
+  --shadow-popover: 0 12px 32px color-mix(in oklab, var(--foreground) 14%, transparent), 0 2px 6px color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
 @theme inline {
   --font-sans: "Geist Variable", sans-serif;
   --font-mono: "Geist Mono Variable", monospace;
   --color-ring: var(--ring);
-  --color-input: var(--input);
   --color-border: var(--border);
   --color-high-contrast-border: var(--high-contrast-border);
   --color-success: var(--success);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -97,18 +83,20 @@
   --color-foreground: var(--foreground);
   --color-background: var(--background);
   --color-background-extra: var(--background-extra);
-  --radius-sm: calc(var(--radius) - 4px);
+  --color-badge-info-bg: var(--badge-info-bg);
+  --color-badge-info-fg: var(--badge-info-fg);
+  --color-badge-purple-bg: var(--badge-purple-bg);
+  --color-badge-purple-fg: var(--badge-purple-fg);
+  --color-badge-warning-bg: var(--badge-warning-bg);
+  --color-badge-warning-fg: var(--badge-warning-fg);
+  --color-badge-success-bg: var(--badge-success-bg);
+  --color-badge-success-fg: var(--badge-success-fg);
+  --color-badge-error-bg: var(--badge-error-bg);
+  --color-badge-error-fg: var(--badge-error-fg);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  --font-heading: var(--font-sans);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-border: var(--sidebar-border);
   --shadow-soft: var(--shadow-soft);
   --shadow-popover: var(--shadow-popover);
 }
@@ -125,7 +113,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
-  color: var(--extra-muted-foreground);
+  color: var(--muted-foreground);
 }
 
 @utility numeric {
@@ -141,6 +129,16 @@
 
 @utility grid-cols-stats {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+}
+
+/* Side column plus main column, for the console and recordings views. */
+@utility grid-cols-aside {
+  grid-template-columns: 24rem minmax(0, 1fr);
+}
+
+/* Viewport height minus main's vertical padding (pt-3 + lg:pb-6), for views that fill the screen. */
+@utility h-main {
+  height: calc(100dvh - --spacing(9));
 }
 
 @utility no-scrollbar {

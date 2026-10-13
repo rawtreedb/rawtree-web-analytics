@@ -1,5 +1,4 @@
-// Decorative background lines for the sign-in page, copied from jev-pr-quality's
-// components/dashboard/animated-lines.tsx (its .brand-lines CSS is inlined as attributes).
+// Decorative background lines for the sign-in page.
 const PATHS = [
   "M-1408.06 1310.98C-1179.22 1156.3 -835.909 981.564 -443.444 1025.69C23.3773 1078.17 202.326 1400.11 437.301 1306.43C805.479 1159.63 601.519 275.375 1032.52 62.7494C1200.92 -20.3269 1397.53 33.0218 1531.19 86.8518",
   "M-1378.3 1344.68C-1148.02 1148.21 -813.996 968.631 -435.461 1011.28C15.1722 1062.06 183.872 1393.63 416.119 1306.06C777.823 1168.15 592.797 285.351 1026.22 81.3979C1197.77 0.671553 1395.78 60.8056 1531.07 121.542",
@@ -50,7 +49,7 @@ export function BrandLines() {
         <g clipPath="url(#brand-lines-clip-frame)">
         <g clipPath="url(#brand-lines-clip)">
           {PATHS.map((d, i) => (
-            <path d={d} key={i} stroke="#cccccc" strokeMiterlimit={10} strokeWidth={0.75} />
+            <path d={d} key={i} stroke="var(--high-contrast-border)" strokeMiterlimit={10} strokeWidth={0.75} />
           ))}
         </g>
         </g>

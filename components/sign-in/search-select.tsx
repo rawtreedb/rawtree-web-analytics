@@ -1,9 +1,9 @@
 "use client";
 
-// A select whose popup has a search input to filter its fixed options, ported from
-// jev-pr-quality's components/ui/search-select.tsx.
+// A select whose popup has a search input to filter its fixed options.
 import { Combobox } from "@base-ui/react/combobox";
 import { IconCheck, IconSearch, IconSelector } from "@tabler/icons-react";
+import { cn, inputClass } from "../ui.tsx";
 
 export function SearchSelect({
   label,
@@ -30,7 +30,9 @@ export function SearchSelect({
       {/* base-ui 1.2 has no Combobox.Label; a wrapping label names the trigger button. */}
       <label className="grid gap-1.5 text-sm font-medium">
         {label}
-        <Combobox.Trigger className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-background px-3 text-left text-sm font-normal outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-primary">
+        <Combobox.Trigger
+          className={cn(inputClass, "flex h-10 w-full items-center justify-between gap-2 text-left font-normal disabled:cursor-not-allowed disabled:opacity-50 data-popup-open:border-ring")}
+        >
           <span className="truncate">
             <Combobox.Value placeholder={<span className="text-muted-foreground">{placeholder}</span>} />
           </span>
@@ -41,7 +43,7 @@ export function SearchSelect({
       </label>
       <Combobox.Portal>
         <Combobox.Positioner align="start" className="z-50 outline-none" sideOffset={4}>
-          <Combobox.Popup aria-label={label} className="w-[var(--anchor-width)] overflow-hidden rounded-lg border bg-card shadow-soft outline-none">
+          <Combobox.Popup aria-label={label} className="w-(--anchor-width) overflow-hidden rounded-lg border bg-card shadow-soft outline-none">
             <div className="flex items-center gap-2 border-b px-3">
               <IconSearch aria-hidden className="size-4 shrink-0 text-muted-foreground" />
               <Combobox.Input

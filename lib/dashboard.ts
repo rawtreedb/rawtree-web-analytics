@@ -3,6 +3,7 @@
 
 import * as Q from "./queries.ts";
 import { previousRange, type Range } from "./range.ts";
+export { ENGAGED_MS, QUICK_EXIT_MS } from "./queries.ts";
 import { isMissingTable, RawTreeError, runQuery, tableName, type RawTreeConfig } from "./rawtree.ts";
 import { planFetch, reassemble, type ChunkPlanRow, type ChunkRow, type RecordingGap } from "./reassembly.ts";
 

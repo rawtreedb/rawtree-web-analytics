@@ -1,6 +1,5 @@
-// Crawler identification from user-agent strings, ported from Treewatcher
-// (lib/crawlers.ts). Categories follow Birdwatcher's bot taxonomy (training,
-// retrieval, indexer, social), plus SEO tools and scripts/headless browsers.
+// Crawler identification from user-agent strings. Categories: AI training, AI retrieval,
+// search indexers, and social previews, plus SEO tools and scripts/headless browsers.
 // The first matching rule wins, so specific tokens come before broader ones.
 // BOT_UA_PATTERN draws the human/bot line for the dashboard SQL (lib/queries.ts); the rules
 // below name and categorize the agents on the bot side. Keep both in step (tests check it).
