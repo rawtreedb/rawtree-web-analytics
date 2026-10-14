@@ -64,7 +64,7 @@ export function StatCard({
         {info ? <InfoTip>{info}</InfoTip> : null}
       </header>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <p className="numeric m-0 text-3xl font-semibold">{formatValue(value, format)}</p>
+        <p className="numeric m-0 whitespace-nowrap text-3xl font-semibold">{formatValue(value, format)}</p>
         {change !== undefined ? (
           <HoverTip className={cn(deltaTrigger, "text-xs")} content={previousPeriodInfo}>
             <Delta kind={changeKind} neutral={neutral} value={change} />

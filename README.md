@@ -2,6 +2,8 @@
 
 Web analytics on [RawTree](https://rawtree.com): an SDK for events and session recordings, a Next.js collector, and a dashboard with bot detection and session replay. Your events land in your own RawTree tables, so every number on the dashboard is a SQL query you can run yourself.
 
+**Live demo:** [web-analytics.rawtree.tech](https://web-analytics.rawtree.tech/). Sign in with your RawTree account or an API key to see your own data.
+
 ![RawTree Web Analytics dashboard](public/overview.jpg)
 
 ## 📦 What's inside

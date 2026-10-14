@@ -213,9 +213,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   <p className="m-0 font-semibold">Your key stays on the server side of this app</p>
                   <p className="m-0 text-muted-foreground">
                     It's kept in an HTTP-only cookie that page scripts can't read, used only to run the dashboard's own queries and the console's test
-                    events, never logged, and cleared when you sign out or close the browser. Create one with{" "}
-                    <code className={codeClass}>rtree key create --permission read_write --database web_analytics</code>.
+                    events, never logged, and cleared when you sign out or close the browser. Create one with:
                   </p>
+                  <code className={cn(codeClass, "block overflow-x-auto whitespace-nowrap px-2 py-1.5")}>
+                    rtree key create --permission read_write --database web_analytics
+                  </code>
                 </>
               ) : (
                 <>
