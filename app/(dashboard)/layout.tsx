@@ -3,9 +3,10 @@
 import Image from "next/image";
 import rawtreeLogo from "../../components/rawtree-logo.svg";
 import { IconLogout } from "@tabler/icons-react";
-import { Button } from "../../components/button.tsx";
+import { Button } from "../../components/ui/button.tsx";
 import { SidebarNav } from "../../components/sidebar-nav.tsx";
-import { ExternalLink, cardClass, cn } from "../../components/ui.tsx";
+import { ExternalLink } from "../../components/ui/external-link.tsx";
+import { cardClass, cn } from "../../components/ui/styles.ts";
 import { requireAccess } from "../../lib/access.ts";
 import { signOut } from "../sign-in/actions.ts";
 import { SITE } from "../../lib/site.ts";

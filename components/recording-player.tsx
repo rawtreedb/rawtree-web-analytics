@@ -8,8 +8,9 @@ import { IconPlayerPauseFilled, IconPlayerPlayFilled, IconRotate } from "@tabler
 import { type RefObject, useEffect, useRef, useState } from "react";
 import type { eventWithTime, Replayer } from "rrweb";
 import { formatValue } from "../lib/format.ts";
-import { Button } from "./button.tsx";
-import { Notice, SegmentedControl } from "./ui.tsx";
+import { Button } from "./ui/button.tsx";
+import { Notice } from "./ui/notice.tsx";
+import { SegmentedControl } from "./ui/segmented-control.tsx";
 
 type ReplayResponse = {
   recordingId: string;

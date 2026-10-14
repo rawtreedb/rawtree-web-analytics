@@ -3,7 +3,7 @@
 // A select whose popup has a search input to filter its fixed options.
 import { Combobox } from "@base-ui/react/combobox";
 import { IconCheck, IconSearch, IconSelector } from "@tabler/icons-react";
-import { cn, inputClass } from "../ui.tsx";
+import { cn, inputClass } from "../ui/styles.ts";
 
 export function SearchSelect({
   label,

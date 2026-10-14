@@ -153,7 +153,7 @@ Everything you send goes to the database you're signed in to (or `RAWTREE_DATABA
 
 **Branding.** The name, tagline, description, and docs/GitHub links live in [`lib/site.ts`](lib/site.ts). The images are `app/icon.svg`, `app/favicon.ico`, `app/apple-icon.png`, `app/opengraph-image.png`, `components/rawtree-logo.svg`, and `public/overview.jpg`. Colors and other design tokens are CSS variables in `app/globals.css`.
 
-**Tune a widget.** Every dashboard query lives in [`lib/queries.ts`](lib/queries.ts), one documented template per widget. Edit the SQL there, for example add a channel host to `SEARCH_HOSTS` or change `ENGAGED_MS` (the dashboard's labels follow it). The SQL aliases are the field names the page reads.
+**Tune a widget.** Every dashboard query lives in [`lib/queries.ts`](lib/queries.ts), one documented template per widget. Edit the SQL there, for example add a channel host to `SEARCH_HOSTS` or change `ENGAGED_MS` (the dashboard's labels follow it). The SQL aliases are the field names the dashboard sections read.
 
 **Add a widget.**
 
@@ -161,8 +161,8 @@ Everything you send goes to the database you're signed in to (or `RAWTREE_DATABA
 2. If it counts events, add it to `EVENT_QUERIES`, so the dedup test checks it.
 3. Add every column it reads that a young table may lack (for example `properties.plan`) to `OPTIONAL_COLUMNS`. A missing column then reads as NULL instead of failing the dashboard.
 4. Run it in `getDashboard` in `lib/dashboard.ts`, with a row type that matches the aliases.
-5. Render it in `app/(dashboard)/page.tsx`.
-6. For a new section, also add its `id` to the `sections` list in `components/sidebar-nav.tsx`, so the sidebar links to it.
+5. Render it in its section in `app/(dashboard)/_sections/` (one file per section), with the cards in `components/dashboard/`.
+6. For a new section, add a file to `app/(dashboard)/_sections/`, render it in `Dashboard` in `app/(dashboard)/page.tsx`, and add its `id` to the `sections` list in `components/sidebar-nav.tsx`, so the sidebar links to it.
 
 Date presets and the previous-period comparison live in `lib/range.ts`. Every day is a UTC day.
 

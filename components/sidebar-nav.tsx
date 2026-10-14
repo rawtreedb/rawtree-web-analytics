@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { IconChartBar, IconCirclePlay, IconTerminal } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { cn, focusRing } from "./ui.tsx";
+import { cn, focusRing } from "./ui/styles.ts";
 
 /** Anchors rendered by the dashboard on `/`; keep in sync with its section ids. */
 const sections = [

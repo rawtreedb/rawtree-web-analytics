@@ -8,8 +8,8 @@ import {
   type Locale,
 } from "react-day-picker"
 
-import { cn } from "../ui.tsx"
-import { Button, buttonClass } from "../button.tsx"
+import { cn } from "./styles.ts"
+import { Button, buttonClass } from "./button.tsx"
 import { IconChevronLeft, IconChevronRight, IconChevronDown } from "@tabler/icons-react"
 
 function Calendar({
@@ -209,4 +209,4 @@ function CalendarDayButton({
   )
 }
 
-export { Calendar, CalendarDayButton }
+export { Calendar }

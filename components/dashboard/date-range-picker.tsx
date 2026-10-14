@@ -4,10 +4,10 @@ import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { formatDay } from "../../lib/format.ts";
 import { IconCalendar, IconChevronDown } from "@tabler/icons-react";
-import { Button } from "../button.tsx";
-import { cn, focusRing } from "../ui.tsx";
-import { Calendar } from "./calendar.tsx";
-import { Popover, PopoverContent, PopoverTrigger } from "./popover.tsx";
+import { Button } from "../ui/button.tsx";
+import { cn, focusRing } from "../ui/styles.ts";
+import { Calendar } from "../ui/calendar.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover.tsx";
 
 /** Inclusive UTC day range as `YYYY-MM-DD` strings. */
 export type DayRange = { from: string; to: string };
@@ -26,7 +26,7 @@ function dayCount(range: DayRange) {
   return Math.round((Date.parse(range.to) - Date.parse(range.from)) / DAY) + 1;
 }
 
-function rangeLabel(range: DayRange) {
+export function formatDayRange(range: DayRange) {
   const year = (day: string) => day.slice(0, 4);
   if (range.from === range.to) return `${formatDay(range.from)}, ${year(range.from)}`;
   const from = year(range.from) === year(range.to) ? formatDay(range.from) : `${formatDay(range.from)}, ${year(range.from)}`;
@@ -146,7 +146,7 @@ export function DateRangePicker({
                 {selected
                   ? tooLong
                     ? `Ranges are limited to ${maxDays} days`
-                    : `${rangeLabel(selected)} · ${dayCount(selected)} ${dayCount(selected) === 1 ? "day" : "days"}`
+                    : `${formatDayRange(selected)} · ${dayCount(selected)} ${dayCount(selected) === 1 ? "day" : "days"}`
                   : draft?.from
                     ? "Select an end day"
                     : "Select a start day"}
@@ -172,5 +172,3 @@ export function DateRangePicker({
     </Popover>
   );
 }
-
-export { rangeLabel as formatDayRange };

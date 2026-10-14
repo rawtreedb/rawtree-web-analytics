@@ -6,8 +6,8 @@ import { IconChevronRight } from "@tabler/icons-react";
 import { useState } from "react";
 import { pickWorkspace } from "../../app/sign-in/actions.ts";
 import type { Workspace } from "../../lib/rawtree-connect.ts";
-import { Button } from "../button.tsx";
-import { codeClass } from "../ui.tsx";
+import { Button } from "../ui/button.tsx";
+import { codeClass } from "../ui/styles.ts";
 import { SearchSelect } from "./search-select.tsx";
 
 const DEFAULT_DATABASE = "web_analytics";

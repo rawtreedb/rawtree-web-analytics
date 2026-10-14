@@ -1,7 +1,7 @@
 // The one button style. A native <button> with no client code, so server components can
 // render it too; `buttonClass` gives the same look to links and to third-party parts.
 import type { ComponentProps } from "react";
-import { cn, focusRing } from "./ui.tsx";
+import { cn, focusRing } from "./styles.ts";
 
 const variants = {
   default: "bg-primary font-semibold text-primary-foreground hover:bg-primary/85",
@@ -16,8 +16,8 @@ const sizes = {
   icon: "size-9",
 } as const;
 
-export type ButtonVariant = keyof typeof variants;
-export type ButtonSize = keyof typeof sizes;
+type ButtonVariant = keyof typeof variants;
+type ButtonSize = keyof typeof sizes;
 
 export function buttonClass(variant: ButtonVariant = "default", size: ButtonSize = "default", className?: string): string {
   return cn(

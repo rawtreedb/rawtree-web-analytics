@@ -6,7 +6,10 @@ import Link from "next/link";
 import { requireAccess, signInAgainIfRejected } from "../../../../lib/access.ts";
 import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../../lib/dashboard.ts";
 import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../../lib/format.ts";
-import { Badge, ErrorCard, PageToolbar, cardClass, cn, focusRing } from "../../../../components/ui.tsx";
+import { ErrorCard } from "../../../../components/dashboard/card.tsx";
+import { PageToolbar } from "../../../../components/dashboard/page-toolbar.tsx";
+import { Badge } from "../../../../components/ui/badge.tsx";
+import { cardClass, cn, focusRing } from "../../../../components/ui/styles.ts";
 import { RecordingPlayer } from "../../../../components/recording-player.tsx";
 
 export const dynamic = "force-dynamic";
