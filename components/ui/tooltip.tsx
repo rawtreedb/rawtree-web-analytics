@@ -38,7 +38,7 @@ export function Tooltip({ content, children, className }: { content: string; chi
           role="tooltip"
           style={{ top: position.top, left: position.left, width: WIDTH }}
         >
-          {/* Matches the chart tooltips (tooltipClass in charts.tsx). */}
+          {/* Matches the chart tooltips (tooltipClass in components/dashboard/chart-styles.ts). */}
           <span className="rounded-lg border bg-card px-3 py-2 leading-snug text-card-foreground shadow-popover">{content}</span>
         </span>
       ) : null}

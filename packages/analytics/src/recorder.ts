@@ -6,7 +6,7 @@
 // URLs, so every emitted event is also sanitized before it is queued:
 // - the page URL in Meta events keeps only allowlisted query parameters;
 // - URL attributes (href, src, action, ...) lose their query string and hash;
-// - text-like attributes (title, alt, aria-label, placeholder) are masked;
+// - text-like attributes (title, alt, aria-label, aria-description, placeholder) are masked;
 // - any other attribute value that contains an email address is masked.
 // Review your own DOM for other sensitive attributes and block or mask those regions.
 
@@ -17,7 +17,10 @@ import { DEFAULT_ALLOWED_QUERY_PARAMS, sanitizeUrl } from "./util.ts";
 type RecordOptions = NonNullable<Parameters<typeof record>[0]>;
 
 export type StartRecordingOptions = Omit<RecordOptions, "emit"> & {
-  /** Query parameters kept in recorded page URLs. Defaults to the utm_* parameters. */
+  /**
+   * Query parameters kept in recorded page URLs. Default: utm_source, utm_medium, utm_campaign,
+   * utm_term, utm_content. Not inherited from the client: pass the same list to both if you change it.
+   */
   allowedQueryParams?: readonly string[];
   /** Attributes whose values are masked. Default: title, alt, aria-label, aria-description, placeholder. */
   maskAttributes?: readonly string[];

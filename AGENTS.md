@@ -1,6 +1,6 @@
 # rawtree-web-analytics
 
-Read `README.md` for what the project does and how it's set up, and `CONTRIBUTING.md` for the checks every change must pass.
+Read `README.md` for what the project does and how it's set up. Follow `CONTRIBUTING.md`: its guidelines are the project's rules, and every change must pass its three checks (`npm run typecheck`, `npm test`, `npm run build`; install with `npm ci`).
 
 ## Scope
 
@@ -9,30 +9,20 @@ Keep it simple. The project is only: an SDK to send events, examples, and a dash
 ## Layout
 
 - `packages/analytics/`: the publishable SDK (`@rawtree/analytics`). `src/protocol.ts` is the event contract; its types and validator are the source of truth for the SDK and the collector.
-- `app/api/collect/route.ts` + `lib/collect.ts`, `lib/rawtree.ts`: the Next.js collector.
-- `lib/queries.ts`: every dashboard SQL query (one documented template per widget; aliases are the fields `app/(dashboard)/page.tsx` reads). `lib/dashboard.ts` runs them; pages import only `lib/dashboard.ts`. Bot detection lives in `lib/crawlers.ts`, date ranges in `lib/range.ts`.
-- `app/(dashboard)/console/` + `components/console/`: the test console page (`/console`). It sends through the workspace SDK to `app/api/console/collect` (same `handleCollect`, with the visitor's `access.ingest`); `app/api/console/server-event` runs the server SDK in-process and `app/api/console/stored` is the storage check (`access.query`).
+- `app/api/collect/route.ts` + `lib/collect.ts`, `lib/rawtree.ts`: the Next.js collector. It always writes with the env ingest key. `lib/access.ts` decides env mode vs sign-in mode for the dashboard and console.
+- `lib/queries.ts`: every dashboard SQL query (one documented template per widget; aliases are the fields the sections in `app/(dashboard)/_sections/` read). `lib/dashboard.ts` runs them; pages import only `lib/dashboard.ts`. Bot detection lives in `lib/crawlers.ts`, date ranges in `lib/range.ts`, branding in `lib/site.ts`.
+- `app/(dashboard)/page.tsx` loads the data and renders one component per section from `app/(dashboard)/_sections/`. One component per file, no barrel files: `components/ui/` holds the generic primitives (`styles.ts` has `cn` and the shared class names), `components/dashboard/` the cards, charts, and layout the dashboard builds on.
+- `app/(dashboard)/console/` + `components/console/`: the test console page (`/console`). It sends through the workspace SDK to `app/api/console/collect` (same `handleCollect`, with the visitor's `access.ingest`); `app/api/console/server-event` runs the server SDK in-process and `app/api/console/stored` is the storage check (`access.query`). Both accept same-origin requests only and cap bodies at 64 KB.
 - `examples/recipes/`: tracking recipes (`RECIPES.md` + `.ts` modules), typechecked by `npm run typecheck`.
-- `test/`: collector tests.
+- `test/`: collector, access, dashboard query, and recording reassembly tests. Every test mocks `fetch`, so none reaches RawTree.
 
-## Commands
+## Agent notes
 
-```sh
-npm install
-npm test             # builds the SDK, runs SDK and collector tests
-npm run typecheck
-npm run build        # SDK + Next.js
-```
-
-Node ≥ 24 runs `.ts` directly: use erasable syntax only (no enums, namespaces, or parameter properties) and `.ts` extensions in relative imports.
-
-## Invariants
-
-- The browser SDK must stay free of rrweb (`./recorder` is a separate entry) and the server entry free of browser globals. `packages/analytics/test/entries.test.ts` and `server.test.ts` check it (part of `npm test`).
-- The collector acknowledges only after RawTree accepted every row. `/api/collect` takes credentials and table destinations only from configuration, never from requests. In sign-in mode the dashboard and `/api/console/*` use the visitor's key or Connect grant (`lib/access.ts`), but SQL and table names still come only from the server.
-- Delivery is at least once: keep IDs stable across retries and deduplicate in every query (`uniqExact(event_id)` or `LIMIT 1 BY`).
-- RawTree reads lag writes by about 0.1–0.4 s and replicas can disagree briefly. Poll in tests; never assume read-after-write.
-- Write synthetic data to the real `events`/`recordings` tables only when the owner asks (since 2026-10-08 they hold example test data at the owner's request). For automated tests use temporary prefixed tables (`RAWTREE_TABLE_PREFIX`) and drop them afterwards. Ask the owner before any other write to shared RawTree resources.
+- Never run SQL or table names that come from a request. Credentials come from configuration or `lib/access.ts`.
+- Delivery is at least once: deduplicate every count (`uniqExact(event_id)` or `LIMIT 1 BY`).
+- Node ≥ 24 runs `.ts` directly: erasable syntax only and `.ts` extensions in relative imports.
+- RawTree reads lag writes by about 0.1–0.4 s and replicas can disagree briefly. Poll, and never assume read-after-write.
+- Write synthetic data to the real `events`/`recordings` tables only when the owner asks (since 2026-10-08 they hold example test data at the owner's request). For live or automated runs against RawTree use temporary prefixed tables (`RAWTREE_TABLE_PREFIX`) and drop them afterwards. Ask the owner before any other write to shared RawTree resources.
 - Secrets live only in `.env.local` (ignored). Keep `.env.example` in sync when configuration changes.
 
 <!-- BEGIN:nextjs-agent-rules -->

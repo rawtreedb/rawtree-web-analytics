@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { createServerAnalytics, type Properties } from "@rawtree/analytics/server";
 import { getAccess } from "../../../../lib/access.ts";
-import { handleCollect } from "../../../../lib/collect.ts";
+import { handleCollect, parseJson, readBody } from "../../../../lib/collect.ts";
 
 /** Stable, outcome-derived IDs like the recipes use (signup:<accountId>, login:<loginId>, ...). */
 const ID_PREFIX: Record<string, [string, string]> = {
@@ -20,7 +20,9 @@ export async function POST(request: Request): Promise<Response> {
   // Like /api/console/collect: only the console page itself may send.
   if (request.headers.get("origin") !== new URL(request.url).origin) return Response.json({ ok: false, error: "Origin is not allowed." }, { status: 403 });
 
-  const body = (await request.json().catch(() => ({}))) as { name?: unknown; properties?: unknown; eventId?: unknown };
+  const text = await readBody(request, 64 * 1024).catch(() => undefined);
+  if (text === undefined) return Response.json({ ok: false, error: "Body is too large or unreadable." }, { status: 413 });
+  const body = (parseJson(text) ?? {}) as { name?: unknown; properties?: unknown; eventId?: unknown };
   const name = typeof body.name === "string" ? body.name : "";
   const properties = body.properties;
   if (!name || name.length > 128) return Response.json({ ok: false, error: "name is required" }, { status: 400 });

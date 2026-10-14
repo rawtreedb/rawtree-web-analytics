@@ -1,7 +1,7 @@
 "use client";
 
-// Reporting-window picker, ported from Treewatcher's GrowthDateFilter. The URL stays the
-// single source of truth for the window (`range` preset, or `range=custom&start&end`).
+// Reporting-window picker for the dashboard. The URL stays the single source of truth for
+// the window (`range` preset, or `range=custom&start&end`).
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { DAY_MS, RANGE_PRESETS, type RangeKey } from "../../lib/range.ts";

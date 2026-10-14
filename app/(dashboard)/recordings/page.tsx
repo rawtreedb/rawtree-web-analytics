@@ -4,7 +4,8 @@
 import { redirect } from "next/navigation";
 import { requireAccess, signInAgainIfRejected } from "../../../lib/access.ts";
 import { getLatestRecordingId, queryErrorMessage } from "../../../lib/dashboard.ts";
-import { CardEmpty, DashboardCard, ErrorCard, PageToolbar } from "../../../components/ui.tsx";
+import { CardEmpty, DashboardCard, ErrorCard } from "../../../components/dashboard/card.tsx";
+import { PageToolbar } from "../../../components/dashboard/page-toolbar.tsx";
 
 export const dynamic = "force-dynamic";
 

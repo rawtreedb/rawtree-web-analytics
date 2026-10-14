@@ -1,39 +1,40 @@
-// Sign-in mode only (no RAWTREE_QUERY_KEY / RAWTREE_INGEST_KEY). Layout follows
-// jev-pr-quality's sign-in page: connect with a RawTree account through Vercel Connect (when
-// RAWTREE_CONNECTOR is set) or with an API key, then a preview and how it works. `?method=key`
+// Sign-in mode only (no RAWTREE_QUERY_KEY / RAWTREE_INGEST_KEY). Connect with a RawTree
+// account through Vercel Connect (when RAWTREE_CONNECTOR is set) or with an API key, then a
+// preview and how it works. `?method=key`
 // picks the API key tab without client JavaScript. Once connected, the page becomes step 2 of the
 // Connect flow: only the workspace picker and Disconnect. Env mode redirects to the dashboard.
 
-import { IconChartBar, IconCheck, IconChevronRight, IconCode, IconDatabase, IconExternalLink, IconSend, IconShieldCheck } from "@tabler/icons-react";
+import { IconChartBar, IconCheck, IconChevronRight, IconCode, IconDatabase, IconSend, IconShieldCheck } from "@tabler/icons-react";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import type { ReactNode } from "react";
 import { connectorInSignInMode, envMode, getAccess, SESSION_COOKIE } from "../../lib/access.ts";
 import { listWorkspaces, type Workspace } from "../../lib/rawtree-connect.ts";
 import { RawTreeError, rawTreeApiUrl } from "../../lib/rawtree.ts";
-import { cn } from "../../components/ui.tsx";
+import { buttonClass } from "../../components/ui/button.tsx";
+import { ExternalLink } from "../../components/ui/external-link.tsx";
+import { Notice } from "../../components/ui/notice.tsx";
+import { cardClass, cn, codeClass, focusRing, inputClass } from "../../components/ui/styles.ts";
 import rawtreeLogo from "../../components/rawtree-logo.svg";
 import { BrandLines } from "../../components/sign-in/brand-lines.tsx";
 import { WorkspacePicker } from "../../components/sign-in/workspace-picker.tsx";
 import overview from "../../public/overview.jpg";
 import { signInWithKey, signOut } from "./actions.ts";
+import { SITE } from "../../lib/site.ts";
 
 export const dynamic = "force-dynamic";
 
 const LINKS = {
   rawtree: "https://rawtree.com",
-  docs: "https://rawtree.com/docs",
+  docs: SITE.links.docs,
   requestAccess: "https://rawtree.com/waitlist",
-  github: "https://github.com/rawtreedb/rawtree-web-analytics",
+  github: SITE.links.github,
 };
 
-const panel = "rounded-2xl border bg-card p-6 shadow-soft";
-const input = "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:border-primary";
-const button =
-  "inline-flex h-9 items-center justify-center gap-1 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/85 disabled:opacity-50";
-const link = "inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline";
+const panel = cn(cardClass, "p-6");
+const input = cn(inputClass, "h-10 w-full");
+const link = cn("inline-flex items-center gap-1 rounded-sm font-medium text-primary underline-offset-4 hover:underline", focusRing);
 
 const HOW_IT_WORKS = [
   { icon: IconCode, title: "Add the SDK", body: "Install @rawtree/analytics and send your own events and session recordings from the browser or backend." },
@@ -56,22 +57,13 @@ async function loadPicker(connector: string | null, session: string | undefined)
   }
 }
 
-function External({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
-  return (
-    <a className={className} href={href} rel="noopener noreferrer" target="_blank">
-      {children}
-      <IconExternalLink aria-hidden className="size-3" />
-    </a>
-  );
-}
-
 function RequestAccess() {
   return (
     <p className="m-0 text-sm text-muted-foreground">
       No RawTree account?{" "}
-      <External className={link} href={LINKS.requestAccess}>
+      <ExternalLink className={link} href={LINKS.requestAccess}>
         Request access
-      </External>
+      </ExternalLink>
     </p>
   );
 }
@@ -93,8 +85,8 @@ function KeyFields({ invalid }: { invalid: boolean }) {
       {invalid ? <p className="m-0 text-sm text-destructive">Enter a key and a valid database name.</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <RequestAccess />
-        <button className={button} type="submit">
-          Load dashboard <IconChevronRight className="size-4" />
+        <button className={buttonClass()} type="submit">
+          Load dashboard <IconChevronRight />
         </button>
       </div>
     </form>
@@ -119,22 +111,22 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-8 px-4 sm:px-6">
           <Link className="flex items-center gap-2.5 font-semibold tracking-tight" href="/sign-in">
             <Image alt="" className="h-7 w-auto" src={rawtreeLogo} />
-            RawTree Web Analytics
+            {SITE.name}
           </Link>
           <nav className="flex items-center gap-5 text-sm text-muted-foreground max-sm:hidden">
-            <External className="inline-flex items-center gap-1 hover:text-foreground" href={LINKS.docs}>
+            <ExternalLink className="hover:text-foreground" href={LINKS.docs}>
               RawTree Docs
-            </External>
-            <External className="inline-flex items-center gap-1 hover:text-foreground" href={LINKS.github}>
+            </ExternalLink>
+            <ExternalLink className="hover:text-foreground" href={LINKS.github}>
               GitHub
-            </External>
+            </ExternalLink>
           </nav>
         </div>
       </header>
 
       <main className="relative isolate flex flex-1 flex-col items-center overflow-hidden px-4 py-12">
         <BrandLines />
-        <div className="relative z-10 flex w-full max-w-[500px] flex-col gap-4">
+        <div className="relative z-10 flex w-full max-w-lg flex-col gap-4">
           <div className="grid gap-2 px-6 pb-2">
             <h1 className="m-0 text-2xl font-semibold tracking-tight">{connected ? "Choose your database" : "Web analytics on RawTree"}</h1>
             <p className="m-0 text-sm text-muted-foreground">
@@ -159,7 +151,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   </button>
                 </div>
               ) : (
-                <h2 className="m-0 text-lg font-semibold">Connect to RawTree</h2>
+                <h2 className="m-0 text-lg font-semibold tracking-tight">Connect to RawTree</h2>
               )}
               {connector && !connected ? (
                 <nav aria-label="Connection method" className="grid grid-cols-2 gap-1 rounded-full bg-muted p-1">
@@ -169,7 +161,10 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   ].map((tab) => (
                     <Link
                       aria-current={tab.active ? "page" : undefined}
-                      className="flex h-9 items-center justify-center rounded-full text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:bg-card aria-[current=page]:text-foreground aria-[current=page]:shadow-soft"
+                      className={cn(
+                        "flex h-9 items-center justify-center rounded-full text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground aria-[current=page]:bg-card aria-[current=page]:text-foreground aria-[current=page]:shadow-soft",
+                        focusRing,
+                      )}
                       href={tab.href}
                       key={tab.label}
                       scroll={false}
@@ -191,19 +186,19 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   )}
                 </p>
               )}
-              {expired ? <p className="m-0 rounded-lg bg-muted px-3 py-2 text-sm">RawTree rejected your credentials. Sign in again.</p> : null}
+              {expired ? <Notice>RawTree rejected your credentials. Sign in again.</Notice> : null}
               {picker.error && !useKey ? <p className="m-0 text-sm text-muted-foreground">{picker.error}</p> : null}
             </div>
 
             {useKey ? (
               <KeyFields invalid={error === "key"} />
             ) : connected ? (
-              <WorkspacePicker buttonClass={button} workspaces={picker.workspaces!} />
+              <WorkspacePicker workspaces={picker.workspaces!} />
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <RequestAccess />
-                <a className={button} href="/api/rawtree/connect">
-                  Connect <IconChevronRight className="size-4" />
+                <a className={buttonClass()} href="/api/rawtree/connect">
+                  Connect <IconChevronRight />
                 </a>
               </div>
             )}
@@ -218,9 +213,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                   <p className="m-0 font-semibold">Your key stays on the server side of this app</p>
                   <p className="m-0 text-muted-foreground">
                     It's kept in an HTTP-only cookie that page scripts can't read, used only to run the dashboard's own queries and the console's test
-                    events, never logged, and cleared when you sign out or close the browser. Create one with{" "}
-                    <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">rtree key create --permission read_write --database web_analytics</code>.
+                    events, never logged, and cleared when you sign out or close the browser. Create one with:
                   </p>
+                  <code className={cn(codeClass, "block overflow-x-auto whitespace-nowrap px-2 py-1.5")}>
+                    rtree key create --permission read_write --database web_analytics
+                  </code>
                 </>
               ) : (
                 <>
@@ -237,23 +234,23 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
 
         {connected ? null : (
           <>
-            <figure className={cn(panel, "relative z-10 m-0 mt-12 w-full max-w-[1120px] p-3 sm:p-6")}>
+            <figure className={cn(panel, "relative z-10 m-0 mt-12 w-full max-w-6xl p-3 sm:p-6")}>
               <figcaption className="mb-4 grid gap-1 px-2 pt-2 text-center sm:mb-6 sm:pt-0">
-                <span className="text-lg font-semibold">What you'll see</span>
+                <span className="text-lg font-semibold tracking-tight">What you'll see</span>
                 <span className="text-sm text-muted-foreground">Traffic, acquisition, engagement, bots, and session replays. Preview uses sample data.</span>
               </figcaption>
               <Image
                 alt="Dashboard preview with headline numbers, the traffic trend, and the dashboard sections"
                 className="h-auto w-full rounded-xl border"
                 placeholder="blur"
-                sizes="(min-width: 1152px) 1072px, calc(100vw - 56px)"
+                sizes="(min-width: 1184px) 1104px, calc(100vw - 56px)"
                 src={overview}
               />
             </figure>
 
-            <section aria-labelledby="how-it-works" className={cn(panel, "relative z-10 mt-6 w-full max-w-[1120px]")}>
+            <section aria-labelledby="how-it-works" className={cn(panel, "relative z-10 mt-6 w-full max-w-6xl")}>
               <div className="mb-6 grid gap-1 text-center">
-                <h2 className="m-0 text-lg font-semibold" id="how-it-works">
+                <h2 className="m-0 text-lg font-semibold tracking-tight" id="how-it-works">
                   How it works
                 </h2>
                 <p className="m-0 text-sm text-muted-foreground">From your app to your dashboard.</p>
@@ -281,9 +278,9 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
                     ? "Your site sends events with an insert-only key. Your dashboard key stays in an HTTP-only cookie."
                     : "Your site sends events with an insert-only key. Viewers sign in with their own RawTree account."}
                 </p>
-                <External className={cn(link, "shrink-0")} href={`${LINKS.github}#-how-it-works`}>
+                <ExternalLink className={cn(link, "shrink-0")} href={`${LINKS.github}#-how-it-works`}>
                   Technical details
-                </External>
+                </ExternalLink>
               </div>
             </section>
           </>

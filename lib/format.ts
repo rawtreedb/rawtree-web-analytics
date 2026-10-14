@@ -33,7 +33,7 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Dashboard value formats, ported from Treewatcher (lib/format.ts).
+// Dashboard value formats.
 export type ValueFormat = "number" | "compact" | "percent" | "decimal" | "ratio" | "duration";
 
 const formatters = {

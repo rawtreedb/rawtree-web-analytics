@@ -6,15 +6,13 @@ Start the browser recipes only after analytics consent. Each one is a function `
 
 ## Shared rules
 
-**Stored rows.** The collector stores each event as one row in the RawTree `events` table with these fields: `v, event_id, event_name, occurred_at_ms, client_sent_at_ms, received_at_ms, source ("browser" | "server"), sdk, session_id, anonymous_id, user_id, page_url, page_path, referrer, user_agent, properties{...}`. Timestamps are epoch milliseconds. `page_url` keeps only allowlisted query parameters (utm_* by default) and no hash. `page_path` is derived from `page_url`.
+**Stored rows.** The collector stores each event as one row in the RawTree `events` table. The columns are listed in the SDK README's [stored tables](../../packages/analytics/README.md#stored-tables). `page_url` keeps only allowlisted query parameters (by default `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, `utm_content`) and no hash.
 
 **Page views.** Page views, exits, scroll depth, and time on page share one page-view state ([`navigation.ts`](navigation.ts)). Their events carry `properties.page_view_id` and `properties.path` (the page the measurement belongs to). Use `properties.path`, not `page_path`, for time on page: it is sent while navigating away, so `page_url` already shows the next page.
 
-**Duplicates.** Delivery is at least once. A retried request can store the same `event_id` twice. Count with `uniqExact(toString(event_id))`, or deduplicate with `LIMIT 1 BY event_id` in a subquery before aggregating values.
+**Queries.** They follow the [query rules](../../README.md#-ask-your-ai-agent): count unique `event_id`s (or deduplicate with `LIMIT 1 BY event_id` in a subquery before aggregating values), cast every field (`CAST(properties.value AS Float64)`), and use an explicit 7-day window. They read the `events` table of your analytics database.
 
-**Queries.** RawTree is ClickHouse-based and stores events as dynamic JSON columns. The queries cast every field explicitly (`toString(event_name)`, `CAST(occurred_at_ms AS Int64)`, `CAST(properties.value AS Float64)`) and use an explicit 7-day window. They read the `events` table of your analytics database.
-
-> ✅ Verified on 2026-10-07: every query below ran on hosted RawTree against data from two end-to-end runs of an example product (browser and backend → collector → RawTree), and the results matched the events each run sent.
+> ✅ Every recipe query below was run on hosted RawTree against end-to-end data from an example product (browser and backend → collector → RawTree), and the results matched the events sent.
 
 | # | Recipe | Event | Source | File |
 | --- | --- | --- | --- | --- |
@@ -29,7 +27,7 @@ Start the browser recipes only after analytics consent. Each one is a function `
 | 9 | [Product events](#9-product-events) | `project_created`, `feature_used` | browser | [product-events.ts](product-events.ts) |
 | 10 | [Backend events](#10-backend-events) | `export_completed` | server | [backend-events.ts](backend-events.ts) |
 
-Two notes on `page_view` data follow the recipes: [bots](#bots) and [acquisition](#acquisition). Their queries are not covered by the verification above yet.
+Two notes on `page_view` data follow the recipes: [bots](#bots) and [acquisition](#acquisition). Their queries were not part of that end-to-end check.
 
 ## 1. Page views
 
@@ -545,7 +543,7 @@ LIMIT 50
 
 ## Acquisition
 
-**Data.** `referrer` is `document.referrer` and `page_url` keeps the `utm_*` parameters (the SDK's default `allowedQueryParams`; anything else is stripped). Attribute a visitor to the referrer and UTM values of their first page view.
+**Data.** `referrer` is `document.referrer` and `page_url` keeps `utm_source`, `utm_medium`, `utm_campaign`, `utm_term`, and `utm_content` (the SDK's default `allowedQueryParams`). Anything else is stripped. Attribute a visitor to the referrer and UTM values of their first page view.
 
 **Test console.** The *Acquisition* buttons send a `page_view` as a new visitor on `/pricing?utm_source=...&utm_medium=...&utm_campaign=...` with a referrer (Google, none for the newsletter, Hacker News). The SDK reads both from the page by default; the console overrides them per event with the `pageUrl` and `referrer` options of `sendEvent`.
 

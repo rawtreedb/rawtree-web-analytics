@@ -1,9 +1,9 @@
-// Dashboard date ranges: Treewatcher's presets or an explicit UTC window. Shared by the
+// Dashboard date ranges: a named preset or an explicit window. Every day is a UTC day. Shared by the
 // server page and the client date filter, so keep it free of server-only imports.
 
 export const DAY_MS = 86_400_000;
 
-/** Treewatcher's reporting-window presets, in picker order. */
+/** Reporting-window presets, in picker order. */
 export const RANGE_PRESETS = {
   today: "Today",
   this_week: "This week",
@@ -43,8 +43,8 @@ function presetWindow(key: RangeKey, nowMs: number): [number, number] {
     case "today": return [today, nowMs];
     case "this_week": return [week, nowMs];
     case "last_week": return [week - 7 * DAY_MS, week];
-    // ponytail: "Last N days" runs through now (today included), unlike Treewatcher's full days,
-    // so fresh analytics show up; switch to [today - N days, today) if full days matter more.
+    // ponytail: "Last N days" runs through now (today included) rather than ending at the last
+    // full day, so fresh analytics show up; switch to [today - N days, today) if full days matter more.
     case "last_7_days": return [today - 6 * DAY_MS, nowMs];
     case "last_28_days": return [today - 27 * DAY_MS, nowMs];
     case "last_90_days": return [today - 89 * DAY_MS, nowMs];
@@ -66,7 +66,7 @@ export function resolveRange(params: SearchParams, nowMs = Date.now()): Resolved
       return { key: "custom", label: "Custom range", fromMs, toMs };
     }
   }
-  const key = range && range in RANGE_PRESETS ? (range as RangeKey) : "last_7_days";
+  const key = range && Object.hasOwn(RANGE_PRESETS, range) ? (range as RangeKey) : "last_7_days";
   const [fromMs, toMs] = presetWindow(key, nowMs);
   return { key, label: RANGE_PRESETS[key], fromMs, toMs };
 }

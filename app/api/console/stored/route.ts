@@ -3,6 +3,7 @@
 // browser; the SQL and table names are fixed here. Body: { eventIds, recordingIds }.
 
 import { getAccess } from "../../../../lib/access.ts";
+import { parseJson, readBody } from "../../../../lib/collect.ts";
 import { isMissingTable, RawTreeError, runQuery, tableName } from "../../../../lib/rawtree.ts";
 
 const ID = /^[A-Za-z0-9_:.\-]{1,128}$/;
@@ -16,7 +17,11 @@ const orEmpty = (error: unknown) => {
 export async function POST(request: Request): Promise<Response> {
   const access = await getAccess();
   if (!access) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const body = (await request.json().catch(() => ({}))) as { eventIds?: unknown; recordingIds?: unknown };
+  // Like /api/console/collect: only the console page itself may ask.
+  if (request.headers.get("origin") !== new URL(request.url).origin) return Response.json({ error: "origin_not_allowed" }, { status: 403 });
+  const text = await readBody(request, 64 * 1024).catch(() => undefined);
+  if (text === undefined) return Response.json({ error: "body_too_large" }, { status: 413 });
+  const body = (parseJson(text) ?? {}) as { eventIds?: unknown; recordingIds?: unknown };
   const eventIds = ids(body.eventIds);
   const recordingIds = ids(body.recordingIds);
   // Bound the event scan: the console polls events for 30 s after sending them. Recordings stay

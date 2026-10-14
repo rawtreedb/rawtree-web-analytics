@@ -6,7 +6,10 @@ import Link from "next/link";
 import { requireAccess, signInAgainIfRejected } from "../../../../lib/access.ts";
 import { getRecording, queryErrorMessage, type RecordingListItem } from "../../../../lib/dashboard.ts";
 import { formatBytes, formatDateTime, formatDuration, formatValue } from "../../../../lib/format.ts";
-import { Badge, ErrorCard, PageToolbar, cn } from "../../../../components/ui.tsx";
+import { ErrorCard } from "../../../../components/dashboard/card.tsx";
+import { PageToolbar } from "../../../../components/dashboard/page-toolbar.tsx";
+import { Badge } from "../../../../components/ui/badge.tsx";
+import { cardClass, cn, focusRing } from "../../../../components/ui/styles.ts";
 import { RecordingPlayer } from "../../../../components/recording-player.tsx";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +22,12 @@ function StatusBadge({ complete, arriving }: { complete: boolean; arriving: bool
 
 function RecordingList({ recordings, selectedId }: { recordings: RecordingListItem[]; selectedId: string }) {
   return (
-    <aside aria-label="Recordings" className="flex min-h-0 flex-col lg:order-first overflow-hidden rounded-2xl border bg-card shadow-soft">
+    <aside aria-label="Recordings" className={cn(cardClass, "flex min-h-0 flex-col overflow-hidden @4xl:order-first")}>
       <header className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="m-0 text-sm font-semibold">Recordings</h2>
+        <h2 className="m-0 text-base font-semibold">Recordings</h2>
         <span className="numeric text-xs text-muted-foreground">{recordings.length}</span>
       </header>
-      <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain p-2 max-lg:max-h-96" data-testid="recordings-list">
+      <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto overscroll-contain p-2 @max-4xl:max-h-96" data-testid="recordings-list">
         {recordings.map((recording) => {
           const selected = recording.recordingId === selectedId;
           return (
@@ -33,6 +36,7 @@ function RecordingList({ recordings, selectedId }: { recordings: RecordingListIt
                 aria-current={selected ? "page" : undefined}
                 className={cn(
                   "grid gap-1 rounded-lg px-3 py-2.5 text-xs transition-colors hover:bg-muted",
+                  focusRing,
                   selected && "bg-primary/10 hover:bg-primary/10",
                 )}
                 href={`/recordings/${recording.recordingId}`}
@@ -70,12 +74,12 @@ export default async function RecordingPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    // From lg up the view fills the viewport (main's padding is p-4 lg:p-6): only the list scrolls.
-    <div className="flex w-full flex-col lg:h-[calc(100dvh-3rem)]">
+    // With two columns (@4xl, like the console) the view fills the viewport: only the list scrolls.
+    <div className="flex w-full flex-col @4xl:h-main">
       <PageToolbar meta={<span>Replayed in the browser from stored chunks. Incomplete recordings replay only their complete stretches.</span>} title="Recordings" />
       {error ? <ErrorCard>{error}</ErrorCard> : null}
-      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)] xl:grid-cols-[20rem_minmax(0,1fr)]">
-        <section className="flex min-h-0 min-w-0 flex-col gap-4 rounded-2xl border bg-card p-4 shadow-soft">
+      <div className="grid gap-4 @4xl:min-h-0 @4xl:flex-1 @4xl:grid-cols-aside">
+        <section className={cn(cardClass, "flex min-h-0 min-w-0 flex-col gap-4 p-4")}>
           {summary ? (
             <>
               <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">

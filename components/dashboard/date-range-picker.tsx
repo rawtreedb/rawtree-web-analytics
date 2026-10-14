@@ -3,10 +3,11 @@
 import { useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { formatDay } from "../../lib/format.ts";
-import { cn } from "../ui.tsx";
-import { Button } from "./button.tsx";
-import { Calendar } from "./calendar.tsx";
-import { Popover, PopoverContent, PopoverTrigger } from "./popover.tsx";
+import { IconCalendar, IconChevronDown } from "@tabler/icons-react";
+import { Button } from "../ui/button.tsx";
+import { cn, focusRing } from "../ui/styles.ts";
+import { Calendar } from "../ui/calendar.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover.tsx";
 
 /** Inclusive UTC day range as `YYYY-MM-DD` strings. */
 export type DayRange = { from: string; to: string };
@@ -25,7 +26,7 @@ function dayCount(range: DayRange) {
   return Math.round((Date.parse(range.to) - Date.parse(range.from)) / DAY) + 1;
 }
 
-function rangeLabel(range: DayRange) {
+export function formatDayRange(range: DayRange) {
   const year = (day: string) => day.slice(0, 4);
   if (range.from === range.to) return `${formatDay(range.from)}, ${year(range.from)}`;
   const from = year(range.from) === year(range.to) ? formatDay(range.from) : `${formatDay(range.from)}, ${year(range.from)}`;
@@ -93,26 +94,12 @@ export function DateRangePicker({
           />
         }
       >
-        <svg
-          aria-hidden="true"
-          className="text-muted-foreground group-data-pending/range:animate-pulse group-data-pending/range:text-primary"
-          fill="none"
-          viewBox="0 0 16 16"
-        >
-          <rect height="10" rx="2" stroke="currentColor" strokeWidth="1.3" width="11" x="2.5" y="3.5" />
-          <path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.3" />
-        </svg>
+        <IconCalendar aria-hidden className="text-muted-foreground group-data-pending/range:animate-pulse group-data-pending/range:text-primary" stroke={1.5} />
         <span className="flex-1 truncate text-left">{label}</span>
         <span className="rounded-full bg-muted px-1.5 py-px font-mono font-semibold text-2xs text-muted-foreground">UTC</span>
-        <svg aria-hidden="true" className="text-muted-foreground" fill="none" viewBox="0 0 16 16">
-          <path d="m4.5 6.5 3.5 3.5 3.5-3.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
-        </svg>
+        <IconChevronDown aria-hidden className="text-muted-foreground" stroke={1.5} />
       </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-auto max-w-(--available-width) gap-0 overflow-hidden p-0 shadow-popover ring-foreground/10"
-        sideOffset={8}
-      >
+      <PopoverContent align="end" sideOffset={8}>
         <div className="flex max-md:max-h-(--available-height) max-md:flex-col max-md:overflow-auto" data-slot="date-range-picker">
           <nav
             aria-label="Preset windows"
@@ -122,7 +109,10 @@ export function DateRangePicker({
             {presets.map((preset) => (
               <button
                 aria-current={preset.value === activePreset ? "true" : undefined}
-                className="cursor-pointer whitespace-nowrap rounded-md px-2.5 py-2 text-left font-medium text-foreground text-sm outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=true]:bg-primary/10 aria-[current=true]:font-semibold aria-[current=true]:text-primary"
+                className={cn(
+                  "cursor-pointer whitespace-nowrap rounded-md px-2.5 py-2 text-left font-medium text-foreground text-sm hover:bg-muted aria-[current=true]:bg-primary/10 aria-[current=true]:font-semibold aria-[current=true]:text-primary",
+                  focusRing,
+                )}
                 key={preset.value}
                 onClick={() => {
                   setOpen(false);
@@ -137,7 +127,6 @@ export function DateRangePicker({
           <div className="px-4 pt-3 pb-3.5" data-slot="date-range-calendar">
             <p className={sectionLabel}>Custom range (UTC days)</p>
             <Calendar
-              className="p-0 cell-size-9"
               defaultMonth={firstVisible}
               disabled={{ after: toDate(maxDay) }}
               endMonth={toDate(maxDay)}
@@ -157,7 +146,7 @@ export function DateRangePicker({
                 {selected
                   ? tooLong
                     ? `Ranges are limited to ${maxDays} days`
-                    : `${rangeLabel(selected)} · ${dayCount(selected)} ${dayCount(selected) === 1 ? "day" : "days"}`
+                    : `${formatDayRange(selected)} · ${dayCount(selected)} ${dayCount(selected) === 1 ? "day" : "days"}`
                   : draft?.from
                     ? "Select an end day"
                     : "Select a start day"}
@@ -183,5 +172,3 @@ export function DateRangePicker({
     </Popover>
   );
 }
-
-export { rangeLabel as formatDayRange };

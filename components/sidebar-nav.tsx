@@ -1,12 +1,12 @@
-// Primary navigation, trimmed from Treewatcher's components/sidebar-nav.tsx: the
-// dashboard with its section anchors (highlighted as they scroll past), Recordings, and
-// the test Console.
+// Primary navigation: the dashboard with its section anchors (highlighted as they scroll
+// past), Recordings, and the test Console.
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { IconChartBar, IconCirclePlay, IconTerminal } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
-import { cn } from "./ui.tsx";
+import { cn, focusRing } from "./ui/styles.ts";
 
 /** Anchors rendered by the dashboard on `/`; keep in sync with its section ids. */
 const sections = [
@@ -17,14 +17,6 @@ const sections = [
   { id: "engagement", label: "Engagement" },
   { id: "bots", label: "Bots" },
 ] as const;
-
-function Icon({ d }: { d: string }) {
-  return (
-    <svg className="size-4.5 flex-none" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path d={d} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 
 /** The last section whose top has scrolled past the sticky toolbar; the final one at page bottom. */
 function useActiveSection(enabled: boolean) {
@@ -62,8 +54,11 @@ function useActiveSection(enabled: boolean) {
   return active;
 }
 
-const itemClass =
-  "flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground aria-[current=page]:bg-sidebar-accent aria-[current=page]:text-sidebar-foreground max-md:justify-center";
+const itemClass = cn(
+  "flex min-h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-muted aria-[current=page]:text-foreground max-md:justify-center",
+  focusRing,
+);
+const iconClass = "size-4.5 flex-none";
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -74,23 +69,24 @@ export function SidebarNav() {
     <nav aria-label="Primary navigation" className="grid gap-0.5 max-md:grid-cols-3 max-md:gap-1">
       <p className="eyebrow mb-1 px-2.5 max-md:hidden">Web analytics</p>
       <Link aria-current={onDashboard ? "page" : undefined} className={itemClass} href="/">
-        <Icon d="M3 16V9m7 7V4m7 12v-5M2 16.5h16" />
+        <IconChartBar aria-hidden className={iconClass} stroke={1.6} />
         <span>Dashboard</span>
       </Link>
       {onDashboard ? (
         <ul
           aria-label="Dashboard sections"
-          className="mt-1 mb-1.5 ml-5 grid list-none gap-0.5 border-l border-sidebar-border pl-2 max-md:col-span-full max-md:row-start-2 max-md:m-0 max-md:flex max-md:gap-1 max-md:overflow-x-auto max-md:border-l-0 max-md:p-0 max-md:no-scrollbar"
+          className="mt-1 mb-1.5 ml-5 grid list-none gap-0.5 border-l pl-2 max-md:col-span-full max-md:row-start-2 max-md:m-0 max-md:flex max-md:gap-1 max-md:overflow-x-auto max-md:border-l-0 max-md:p-0 max-md:no-scrollbar"
         >
           {sections.map(({ id, label }) => (
             <li key={id}>
               <a
                 aria-current={active === id ? "location" : undefined}
                 className={cn(
-                  "block rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-sidebar-accent hover:text-foreground max-md:whitespace-nowrap",
+                  "block rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground max-md:whitespace-nowrap",
+                  focusRing,
                   // The active marker sits on the list's left border: pl-2 plus the 1px border.
                   active === id &&
-                    "relative font-semibold text-foreground before:absolute before:inset-y-1.5 before:-left-2.25 before:w-0.5 before:rounded-xs before:bg-sidebar-foreground max-md:bg-muted max-md:before:hidden",
+                    "relative font-semibold text-foreground before:absolute before:inset-y-1.5 before:-left-2.25 before:w-0.5 before:rounded-xs before:bg-foreground max-md:bg-muted max-md:before:hidden",
                 )}
                 href={`#${id}`}
               >
@@ -101,11 +97,11 @@ export function SidebarNav() {
         </ul>
       ) : null}
       <Link aria-current={pathname.startsWith("/recordings") ? "page" : undefined} className={cn(itemClass, "max-md:row-start-1 max-md:col-start-2")} href="/recordings">
-        <Icon d="M10 17.5a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15ZM8.5 7.25v5.5l4.25-2.75z" />
+        <IconCirclePlay aria-hidden className={iconClass} stroke={1.6} />
         <span>Recordings</span>
       </Link>
       <Link aria-current={pathname.startsWith("/console") ? "page" : undefined} className={cn(itemClass, "max-md:row-start-1 max-md:col-start-3")} href="/console">
-        <Icon d="M3.5 5.5 7.5 10l-4 4.5M10 15h6.5" />
+        <IconTerminal aria-hidden className={iconClass} stroke={1.6} />
         <span>Console</span>
       </Link>
     </nav>

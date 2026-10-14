@@ -4,7 +4,7 @@
 
 import { type EventInput, parseCollectRequest, PROTOCOL_VERSION, type Properties } from "./protocol.ts";
 import { RETRYABLE } from "./queue.ts";
-import { SDK_VERSION, uuid } from "./util.ts";
+import { DEFAULT_ALLOWED_QUERY_PARAMS, SDK_VERSION, sanitizeUrl, uuid } from "./util.ts";
 
 export type { Properties } from "./protocol.ts";
 
@@ -17,6 +17,8 @@ export type ServerAnalyticsOptions = {
   maxRetries?: number;
   /** Per-attempt timeout. Default 10 s. */
   timeoutMs?: number;
+  /** Query parameters kept in pageUrl. Default: the five utm_* parameters, like the browser client. */
+  allowedQueryParams?: readonly string[];
   fetch?: typeof fetch;
 };
 
@@ -30,6 +32,7 @@ export type ServerEventContext = {
   userId?: string;
   anonymousId?: string;
   sessionId?: string;
+  /** Sanitized like the browser client: no credentials, no hash, only allowed query parameters. */
   pageUrl?: string;
   /** Stored as the event's user agent; the collector otherwise falls back to the request header. */
   userAgent?: string;
@@ -45,6 +48,7 @@ const SDK = `@rawtree/analytics@${SDK_VERSION}/server`;
 export function createServerAnalytics(options: ServerAnalyticsOptions): ServerAnalytics {
   const doFetch = options.fetch ?? globalThis.fetch.bind(globalThis);
   const maxRetries = options.maxRetries ?? 2;
+  const allowedQueryParams = options.allowedQueryParams ?? DEFAULT_ALLOWED_QUERY_PARAMS;
   return {
     async sendEvent(name, properties = {}, context = {}) {
       const now = Date.now();
@@ -53,7 +57,8 @@ export function createServerAnalytics(options: ServerAnalyticsOptions): ServerAn
       if (context.userId) event.user_id = context.userId;
       if (context.anonymousId) event.anonymous_id = context.anonymousId;
       if (context.sessionId) event.session_id = context.sessionId;
-      if (context.pageUrl) event.page_url = context.pageUrl;
+      // A URL sanitizeUrl can't parse goes through unchanged, so validation still rejects it.
+      if (context.pageUrl) event.page_url = sanitizeUrl(context.pageUrl, allowedQueryParams) ?? context.pageUrl;
       if (context.userAgent) event.user_agent = context.userAgent;
       const body = { v: PROTOCOL_VERSION, sent_at: now, sdk: SDK, events: [event] };
       const checked = parseCollectRequest(body, now);
