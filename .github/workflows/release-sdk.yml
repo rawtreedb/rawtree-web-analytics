@@ -2,8 +2,8 @@ name: Release SDK
 
 # Publishes @rawtree/analytics to npm when a tag like `analytics-v0.1.0` is pushed.
 # The tag must match packages/analytics/package.json. Auth uses npm trusted publishing
-# (OIDC, no stored token) once it's configured for this workflow on npmjs.com; an
-# NPM_TOKEN repository secret works as a fallback.
+# (OIDC, no stored token), configured for this workflow on npmjs.com. The package
+# disallows tokens that bypass 2FA, so there is no token fallback.
 
 on:
   push:
@@ -44,5 +44,3 @@ jobs:
 
       - name: Publish
         run: npm publish -w @rawtree/analytics --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
