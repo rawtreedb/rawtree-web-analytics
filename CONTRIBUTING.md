@@ -47,7 +47,7 @@ CI runs the same three checks on every pull request. Every pull request also get
 2. Tag the merge commit and push the tag: `git tag analytics-v0.2.0 && git push origin analytics-v0.2.0`.
 3. The workflow checks that the tag matches the version, runs the tests, and publishes.
 
-One-time setup: an npm account with publish rights on the `@rawtree` scope, and on npmjs.com a trusted publisher for this repository and the `release-sdk.yml` workflow (or an `NPM_TOKEN` repository secret). Provenance requires the repository to be public.
+Publishing uses npm trusted publishing only: `@rawtree/analytics` trusts this repository's `release-sdk.yml` workflow on npmjs.com and disallows tokens that bypass 2FA, so there's no `NPM_TOKEN` secret. To change the setup, ask a `@rawtree` npm org owner. Provenance requires the repository to be public.
 
 ## License
 
