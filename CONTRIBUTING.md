@@ -43,7 +43,12 @@ CI runs the same three checks on every pull request. Every pull request also get
 
 `@rawtree/analytics` is published to npm by the [Release SDK](.github/workflows/release-sdk.yml) workflow, with provenance.
 
-1. Bump `version` in `packages/analytics/package.json` in a pull request (semver: breaking changes to the event contract or the public API need a major version once we're past 0.x) and merge it.
+1. Bump the version in a pull request and merge it. It lives in three places, and a test fails if they disagree:
+   - `version` in `packages/analytics/package.json`
+   - `SDK_VERSION` in `packages/analytics/src/util.ts` (sent with every request)
+   - the `packages/analytics` entry in `package-lock.json`
+
+   Use semver: breaking changes to the event contract or the public API need a major version once we're past 0.x.
 2. Tag the merge commit and push the tag: `git tag analytics-v0.2.0 && git push origin analytics-v0.2.0`.
 3. The workflow checks that the tag matches the version, runs the tests, and publishes.
 

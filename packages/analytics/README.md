@@ -64,6 +64,7 @@ analytics.discardRecording();
 It also sanitizes every event before queuing:
 - Page URLs keep only allowlisted query parameters.
 - URL attributes (`href`, `src`, `action`, …) lose their query string and hash.
+- Email addresses in recorded URLs (paths and `mailto:` links, plain or `%40`-encoded) are masked.
 - `title`, `alt`, `aria-label`, `aria-description`, and `placeholder` are masked.
 - Any other attribute containing an email address is masked.
 

@@ -1,5 +1,5 @@
 /** Keep in sync with package.json (checked by a test). */
-export const SDK_VERSION = "0.1.1";
+export const SDK_VERSION = "0.1.2";
 
 /** Random UUID v4. Falls back to getRandomValues where randomUUID is unavailable (insecure contexts). */
 export function uuid(): string {
