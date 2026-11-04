@@ -53,3 +53,27 @@ it("removes URL secrets and attribute PII from Meta, snapshot, and mutation even
     "data-x": "ok",
   });
 });
+
+it("masks email addresses in URL paths and mailto links", () => {
+  const meta = sanitizeRecordingEvent({ type: 4, timestamp: 1, data: { href: "https://app.example/users/jane%40example.com/settings", width: 1, height: 1 } });
+  assert.equal((meta.data as { href: string }).href, "https://app.example/users/******************/settings");
+
+  const snapshot = sanitizeRecordingEvent({
+    type: 2,
+    timestamp: 1,
+    data: {
+      node: {
+        type: 0,
+        childNodes: [
+          { type: 2, tagName: "a", attributes: { href: "/users/jane@example.com/profile?tab=1" }, childNodes: [] },
+          { type: 2, tagName: "a", attributes: { href: "mailto:jane@example.com" }, childNodes: [] },
+          { type: 2, tagName: "a", attributes: { href: "https://shop.example/docs/v1.2" }, childNodes: [] },
+        ],
+      },
+    },
+  });
+  const json = JSON.stringify(snapshot);
+  assert.ok(!json.includes("jane"), "emails removed");
+  assert.ok(json.includes('"href":"/users/****************/profile"'));
+  assert.ok(json.includes('"href":"https://shop.example/docs/v1.2"'), "URLs without emails are kept");
+});

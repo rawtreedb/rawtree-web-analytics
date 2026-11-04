@@ -222,6 +222,19 @@ describe("createAnalytics", () => {
     analytics.stop();
   });
 
+  it("starts no flush timer without a window (SSR), so nothing keeps running after the render", async () => {
+    delete (globalThis as Record<string, unknown>).window;
+    const { calls, fetch } = collector();
+    const { analytics } = client(fetch, { flushIntervalMs: 1000 });
+    analytics.sendEvent("rendered");
+    mock.timers.tick(10_000);
+    await settle();
+    assert.equal(calls.length, 0);
+    await analytics.flush();
+    assert.equal(calls.length, 1, "flush() still sends on demand");
+    analytics.stop();
+  });
+
   it("discardRecording() drops unsent recording data, keeps events, and starts a new recording", async () => {
     const { calls, fetch } = collector();
     const { analytics } = client(fetch);

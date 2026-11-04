@@ -6,6 +6,7 @@
 // URLs, so every emitted event is also sanitized before it is queued:
 // - the page URL in Meta events keeps only allowlisted query parameters;
 // - URL attributes (href, src, action, ...) lose their query string and hash;
+// - email addresses in URLs (paths, mailto: links, plain or %40-encoded) are masked;
 // - text-like attributes (title, alt, aria-label, aria-description, placeholder) are masked;
 // - any other attribute value that contains an email address is masked.
 // Review your own DOM for other sensitive attributes and block or mask those regions.
@@ -41,6 +42,9 @@ const URL_ATTRIBUTES = new Set(["href", "src", "action", "formaction", "poster",
 const DEFAULT_MASKED_ATTRIBUTES = ["title", "alt", "aria-label", "aria-description", "placeholder"];
 const EMAIL = /[^\s@<>"']+@[^\s@<>"']+\.[a-z]{2,}/i;
 const mask = (value: string) => value.replace(/\S/g, "*");
+/** An email inside one URL segment, plain or with %40 for "@". */
+const EMAIL_IN_URL = /[^\s@<>"'/?#&=]+(?:@|%40)[^\s@<>"'/?#&=]+\.[a-z]{2,}/gi;
+const maskUrlEmails = (value: string) => value.replace(EMAIL_IN_URL, mask);
 
 type SerializedNode = { attributes?: Record<string, unknown>; childNodes?: SerializedNode[] };
 
@@ -48,7 +52,7 @@ function sanitizeAttributes(attributes: Record<string, unknown>, masked: Readonl
   for (const [name, value] of Object.entries(attributes)) {
     if (typeof value !== "string" || name.startsWith("rr_") || name === "style") continue;
     const key = name.toLowerCase();
-    if (URL_ATTRIBUTES.has(key)) attributes[name] = value.replace(/[?#].*$/s, "");
+    if (URL_ATTRIBUTES.has(key)) attributes[name] = maskUrlEmails(value.replace(/[?#].*$/s, ""));
     else if (masked.has(key) || EMAIL.test(value)) attributes[name] = mask(value);
   }
 }
@@ -76,7 +80,7 @@ function sanitize(event: RrwebEvent, allowedQueryParams: readonly string[], mask
   const data = event.data as Record<string, unknown> | undefined;
   if (!data) return event;
   if (event.type === 4 && typeof data.href === "string") {
-    data.href = sanitizeUrl(data.href, allowedQueryParams) ?? "";
+    data.href = maskUrlEmails(sanitizeUrl(data.href, allowedQueryParams) ?? "");
   } else if (event.type === 2) {
     sanitizeNode(data.node as SerializedNode, masked);
   } else if (event.type === 3 && data.source === 0) {

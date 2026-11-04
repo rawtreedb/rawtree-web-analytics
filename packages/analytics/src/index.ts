@@ -11,6 +11,8 @@
 // - recording_id: one per client instance (page load), rotated by reset(). Each recording
 //   chunk carries the session_id that was current when the chunk closed.
 // Without localStorage (blocked storage, SSR) IDs live in memory for the page only.
+// Without a window (SSR) there is no flush timer: call flush() yourself, or better, use
+// the server entry for server-side events.
 
 import { RecordingChunker, type RrwebEvent } from "./chunker.ts";
 import { type EventInput, LIMITS, parseCollectRequest, PROTOCOL_VERSION, type Properties } from "./protocol.ts";
@@ -199,7 +201,8 @@ export function createAnalytics(options: AnalyticsOptions): Analytics {
     return queue.flush().catch(() => undefined);
   }
 
-  const timer = setInterval(() => void flushNow(), options.flushIntervalMs ?? 5000);
+  // A timer created during server rendering would never be cleared and would pile up per request.
+  const timer = typeof window === "undefined" ? undefined : setInterval(() => void flushNow(), options.flushIntervalMs ?? 5000);
   // Best effort: the page may be discarded after either event without further callbacks.
   const onPageHide = () => {
     leaving = true;

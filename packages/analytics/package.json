@@ -1,6 +1,6 @@
 {
   "name": "@rawtree/analytics",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Generic event and rrweb recording SDK for RawTree Web Analytics",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/rawtreedb/rawtree-web-analytics.git", "directory": "packages/analytics" },
