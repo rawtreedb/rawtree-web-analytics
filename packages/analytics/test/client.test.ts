@@ -208,6 +208,20 @@ describe("createAnalytics", () => {
     analytics.stop();
   });
 
+  it("does not let a recording chunk too large for keepalive block the events queued behind it", async () => {
+    const { calls, fetch } = collector();
+    const { analytics } = client(fetch);
+    analytics.sendRecording({ type: 4, timestamp: NOW, data: { href: HREF, width: 1, height: 1 } });
+    analytics.sendRecording({ type: 2, timestamp: NOW, data: { node: { text: "x".repeat(62_000) } } });
+    doc.addEventListener("visibilitychange", () => analytics.sendEvent("page_exit"));
+    doc.visibilityState = "hidden";
+    doc.dispatchEvent(new Event("visibilitychange"));
+    await settle();
+    assert.deepEqual(calls.flatMap((c) => c.body.events?.map((e) => e.name) ?? []), ["page_exit"]);
+    for (const c of calls) assert.ok(String(c.init.body).length <= 60_000);
+    analytics.stop();
+  });
+
   it("discardRecording() drops unsent recording data, keeps events, and starts a new recording", async () => {
     const { calls, fetch } = collector();
     const { analytics } = client(fetch);

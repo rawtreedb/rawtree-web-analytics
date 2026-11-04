@@ -140,23 +140,33 @@ export class BatchQueue {
     this.queuedBytes = 0;
   }
 
+  /**
+   * Oldest items that fit one request. Items that don't fit are skipped, not waited on, so a
+   * recording part too large for a keepalive request never holds back the events behind it.
+   * Order is safe to change: parts carry their own sequence and readers deduplicate events.
+   */
   private take(maxRequestBytes: number): Item[] {
     let bytes = ENVELOPE_BYTES;
     let events = 0;
     let parts = 0;
-    let count = 0;
+    const batch: Item[] = [];
+    const rest: Item[] = [];
     for (const item of this.items) {
-      const full =
-        bytes + item.bytes > maxRequestBytes ||
-        (item.kind === "event" ? events >= LIMITS.maxEventsPerRequest : parts >= LIMITS.maxRecordingPartsPerRequest);
-      if (full) break;
+      const fits =
+        bytes + item.bytes <= maxRequestBytes &&
+        (item.kind === "event" ? events < LIMITS.maxEventsPerRequest : parts < LIMITS.maxRecordingPartsPerRequest);
+      if (!fits) {
+        rest.push(item);
+        continue;
+      }
       bytes += item.bytes;
       if (item.kind === "event") events++;
       else parts++;
-      count++;
+      batch.push(item);
     }
+    this.items = rest;
     this.queuedBytes -= bytes - ENVELOPE_BYTES;
-    return this.items.splice(0, count);
+    return batch;
   }
 
   private putBack(batch: Item[], epoch: number): void {
